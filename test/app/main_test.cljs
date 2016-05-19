@@ -1,4 +1,5 @@
-(ns app.core-test
+
+(ns app.main-test
   (:require [cljs.test :refer-macros [deftest testing is]]))
 
 (deftest silly-test

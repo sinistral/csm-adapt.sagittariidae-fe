@@ -1,12 +1,14 @@
+
 (set-env!
- :resource-paths #{"src" "html"}
- :dependencies '[[adzerk/boot-cljs            "1.7.228-1"      :scope "test"]
+ :dependencies '[;; Project dependencies.
+                 [org.clojure/clojure         "1.7.0"]
+                 [org.clojure/clojurescript   "1.7.228"]
+                 ;; Build and REPL dependencies.
+                 [adzerk/boot-cljs            "1.7.228-1"      :scope "test"]
                  [adzerk/boot-cljs-repl       "0.3.0"          :scope "test"]
                  [adzerk/boot-reload          "0.4.5"          :scope "test"]
                  [pandeiro/boot-http          "0.7.1-SNAPSHOT" :scope "test"]
                  [crisptrutski/boot-cljs-test "0.2.2-SNAPSHOT" :scope "test"]
-                 [org.clojure/clojure         "1.7.0"]
-                 [org.clojure/clojurescript   "1.7.228"]
                  [com.cemerick/piggieback     "0.2.1"          :scope "test"]
                  [weasel                      "0.7.0"          :scope "test"]
                  [org.clojure/tools.nrepl     "0.2.12"         :scope "test"]])
@@ -19,6 +21,10 @@
   '[adzerk.boot-reload    :refer [reload]]
   '[crisptrutski.boot-cljs-test  :refer [exit! test-cljs]]
   '[pandeiro.boot-http    :refer [serve]])
+
+(set-env!
+ :source-paths #{"src"}
+ :resource-paths #{"html" (.getPath (io/file "dep" "bower_components"))})
 
 (def test-suffix "-test")
 
@@ -47,7 +53,7 @@
     (spit out-file (pr-str decorated))))
 
 (deftask testing
-  [i ids IDS #{str} ""]
+  [i ids IDS #{str} "The IDs of the build to be tested"]
   (with-pre-wrap fileset
     (merge-env! :source-paths #{"test"})
     (if-let [build-spec-edns (seq (main-files fileset ids))]
@@ -57,19 +63,20 @@
       fileset)))
 
 (deftask auto-test []
-  (comp (testing :ids #{"main"})
+  (comp (testing)
         (watch)
         (speak)
         (test-cljs)))
 
-(deftask dev []
-  (comp (testing :ids #{"main"})
+(deftask dev
+  [i id ID str "The ID of the build for which REPL/auto-reload functionality is to be provided"]
+  (comp (testing :ids #{id})
         (serve)
         (watch)
         (speak)
-        (reload :on-jsload 'app.core/main)
-        (cljs-repl)
-        (cljs :source-map true :optimizations :none)))
+        (reload :ids #{id} :on-jsload (symbol (str "app." id) "main"))
+        (cljs-repl :ids #{id})
+        (cljs :ids #{id} :source-map true :optimizations :none)))
 
 (deftask test []
   (comp (testing)

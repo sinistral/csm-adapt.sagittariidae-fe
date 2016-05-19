@@ -1,0 +1,3 @@
+{:require  [app.upload]
+ :init-fns [app.upload/main]
+ :compiler-options {}}

@@ -1,4 +1,5 @@
-(ns app.core)
+
+(ns app.main)
 
 (defn main []
   (let [c (.. js/document (createElement "DIV"))]
