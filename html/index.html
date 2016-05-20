@@ -71,26 +71,97 @@
 
         <div class="row"> <!-- sample detail -->
           <div class="col-md-12" style="padding-top: 20px;">
-            <div class="col-md-offset-0 col-md-6"
-                 style="height: 300px; border-style: solid; border-width: 1px; border-color: gray;">
-              samples
+            <div class="col-md-offset-0 col-md-6">
+              <div style="max-height: 500px !important; overflow: auto;">
+                <table class="table table-condensed table-striped table-hover">
+                  <tr>
+                    <th>#</th>
+                    <th>Method</th>
+                    <th>Annotation</th>
+                    <th>Cross reference</th>
+                  </tr>
+                  <tr>
+                    <td>1</td>
+                    <td>X-ray tomography</td>
+                    <td>Very cool scan</td>
+                    <td><a href="http://citrine.com/adapt/sample/000-000-000">Citrene: 000-000-000</a></td>
+                  </tr>
+                  <tr>
+                    <td>2</td>
+                    <td>Compression test</td>
+                    <td>Squishy!</td>
+                    <td>...</td>
+                  </tr>
+                </table>
+              </div>
             </div>
-            <div class="col-md-offset-0 col-md-6"
-                 style="height: 300px; border-style: solid; border-width: 1px; border-color: gray;">
-              fileset
+            <div class="col-md-offset-0 col-md-6">
+              <div style="max-height: 500px !important; overflow: auto;">
+                <table class="table table-condensed table-striped table-hover">
+                  <tr>
+                    <th>Files for stage 1</th>
+                    <th>Status</th>
+                  </tr>
+                  <tr>
+                    <td>project-id.sample-id.tomo.000</td>
+                    <td>
+                      <span class="glyphicon glyphicon-save"></span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>project-id.sample-id.tomo.001</td>
+                    <td>
+                      <span class="glyphicon glyphicon-save"></span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>project-id.sample-id.tomo.002</td>
+                    <td>
+                      <span class="glyphicon glyphicon-refresh"></span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
             </div>
           </div>
         </div> <!-- row: sample detail -->
 
         <div class="row"> <!-- control bars -->
           <div class="col-md-12">
-            <div class="col-md-offset-0 col-md-6"
-                 style="height: 100px; border-style: solid; border-width: 1px; border-color: gray;">
-              new test
+            <div class="col-md-offset-0 col-md-6">
+              <form class="form form-inline dropup">
+                <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                  Method
+                  <span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="dropdownMenu3">
+                  <li class="dropdown-header">Scans</li>
+                  <li><a href="#">X-ray tomography</a></li>
+                  <li class="dropdown-header">Physical tests</li>
+                  <li><a href="#">Compression</a></li>
+                  <li><a href="#">Bi-axial strain</a></li>
+                  <li class="dropdown-header">Analysis</li>
+                  <li><a href="#">Porosity analysis</a></li>
+                </ul>
+                <input type="text" class="form-control" placeholder="Annotation"
+                       style="width: 424px">
+                <button class="btn btn-default" type="button">
+                  <span class="glyphicon glyphicon-plus"></span>
+                </button>
+              </form>
             </div>
-            <div class="col-md-offset-0 col-md-6"
-                 style="height: 100px; border-style: solid; border-width: 1px; border-color: gray;">
-              new file
+            <div class="col-md-offset-0 col-md-6">
+              <form class="form form-inline">
+                <input type="text" class="form-control" placeholder="Add file ..."
+                       style="width: 472px"
+                       disabled>
+                <button class="btn btn-default" type="button">
+                  <span class="glyphicon glyphicon-file"></span>
+                </button>
+                <button class="btn btn-default" type="button">
+                  <span class="glyphicon glyphicon-upload"></span>
+                </button>
+              </form>
             </div>
           </div>
         </div> <!-- row: control bars -->
