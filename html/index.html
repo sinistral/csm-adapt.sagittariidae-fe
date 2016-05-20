@@ -1,12 +1,114 @@
 <!doctype html>
-<html>
+<html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <title>hi, world!</title>
-    <link rel="stylesheet" type="text/css" href="css/main.css">
+    <title>Sagittariidae</title>
+    <link href="bootstrap/dist/css/bootstrap.min.css"
+          rel="stylesheet"></link>
+    <script type="application/javascript"
+            src="jquery/dist/jquery.min.js"></script>
+    <script type="application/javascript"
+            src="bootstrap/dist/js/bootstrap.min.js"></script>
   </head>
   <body>
-    <h1>hi, world!</h1>
-    <div id="container" class="blue-border"/>
+    <div class="container-fluid">
+
+      <nav class="navbar navbar-default navbar-fixed-top">
+        <div class="container-fluid">
+          <!-- Brand and toggle get grouped for better mobile display -->
+          <div class="navbar-header">
+            <button type="button" class="navbar-toggle collapsed"
+                    data-toggle="collapse"
+                    data-target="#bs-example-navbar-collapse-1"
+                    aria-expanded="false">
+              <span class="sr-only">Toggle navigation</span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </button>
+            <p class="navbar-brand">Sagittariidae <small>
+                <span class="label label-danger">alpha</span>
+              </small>
+            </p>
+          </div>
+
+          <!-- Collect the nav links, forms, and other content for toggling -->
+          <ul class="nav navbar-nav navbar-right">
+            <li class="dropdown">
+              <a href="#"
+                 class="dropdown-toggle"
+                 data-toggle="dropdown"
+                 role="button"
+                 aria-haspopup="true" aria-expanded="false">
+                Project
+                <span class="caret"></span>
+              </a>
+              <ul class="dropdown-menu">
+                <li><a href="#">Inconel</a></li>
+                <li><a href="#">Manhatten</a></li>
+                <li><a href="#">Something else here</a></li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      <div class="container-fluid" style="padding-top: 100px;">
+
+        <div class="row"> <!-- sample search -->
+          <div class="col-md-offset-2 col-md-8">
+            <div class="col-md-12">
+              <div class="input-group">
+                <input type="text" class="form-control" placeholder="Retrieve sample ...">
+                <span class="input-group-btn">
+                  <button class="btn btn-default" type="button">
+                    <span class="glyphicon glyphicon-download"></span>
+                  </button>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div> <!-- row: sample search -->
+
+        <div class="row"> <!-- sample detail -->
+          <div class="col-md-12" style="padding-top: 20px;">
+            <div class="col-md-offset-0 col-md-6"
+                 style="height: 300px; border-style: solid; border-width: 1px; border-color: gray;">
+              samples
+            </div>
+            <div class="col-md-offset-0 col-md-6"
+                 style="height: 300px; border-style: solid; border-width: 1px; border-color: gray;">
+              fileset
+            </div>
+          </div>
+        </div> <!-- row: sample detail -->
+
+        <div class="row"> <!-- control bars -->
+          <div class="col-md-12">
+            <div class="col-md-offset-0 col-md-6"
+                 style="height: 100px; border-style: solid; border-width: 1px; border-color: gray;">
+              new test
+            </div>
+            <div class="col-md-offset-0 col-md-6"
+                 style="height: 100px; border-style: solid; border-width: 1px; border-color: gray;">
+              new file
+            </div>
+          </div>
+        </div> <!-- row: control bars -->
+
+      </div>
+
+      <nav class="navbar navbar-default navbar-fixed-bottom">
+        <div class="container-fluid">
+          <div class="navbar-text" id="status-bar" />
+        </div>
+        <ul class="nav navbar-nav navbar-right">
+          <li>
+            <p class="navbar-text">Good morning, Dave</p>
+          </li>
+        </ul>
+      </nav>
+
+    </div>
     <script type="text/javascript" src="main.js"></script>
   </body>
 </html>
