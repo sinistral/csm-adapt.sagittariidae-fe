@@ -3,6 +3,8 @@
  :dependencies '[;; Project dependencies.
                  [org.clojure/clojure         "1.7.0"]
                  [org.clojure/clojurescript   "1.7.228"]
+                 [reagent                     "0.6.0-alpha"]
+                 [cljsjs/react-bootstrap      "0.29.2-0"]
                  ;; Build and REPL dependencies.
                  [adzerk/boot-cljs            "1.7.228-1"      :scope "test"]
                  [adzerk/boot-cljs-repl       "0.3.0"          :scope "test"]
