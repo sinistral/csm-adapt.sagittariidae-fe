@@ -6,9 +6,9 @@
 
 ;; --------------------------------------------------------------- state --- ;;
 
-(def db {:samples {"P001-B001-C001-R001" [{:id 0 :annotation "Ann0"}
-                                          {:id 1 :annotation "Ann1"}]
-                   "P001-B001-C001-R002" [{:id 1 :annotation "Ann2"}]}
+(def db {:samples {"P001-B001-C001-R001" [{:id 0 :method-id 0 :annotation "Ann0"}
+                                          {:id 1 :method-id 1 :annotation "Ann1"}]
+                   "P001-B001-C001-R002" [{:id 0 :method-id 1 :annotation "Ann2"}]}
          :methods {0 {:name "X-ray tomography" :type :scan}
                    1 {:name "Compression" :type :physical}
                    2 {:name "Strain" :type :physical}
@@ -32,15 +32,28 @@
        [:span.glyphicon.glyphicon-download]]]]))
 
 (defn component:table
-  [header rows]
+  [spec rows]
   [:table.table.table-condensed.table-striped.table-hover
+   ;; Note: Attempting to deref a Reagent atom inside a lazy seq can cause
+   ;; problems, because the execution context could move from the component in
+   ;; which lazy-deq is created, to the point at which it is expanded.  (In the
+   ;; example below, the lazy-seq return by the `for` loop wouldn't be expanded
+   ;; until the `:tr` is expanded, at which point the atom no longer knows that
+   ;; the intent was to have it deref'd in this component.
+   ;;
+   ;; See [1] for a more detailed discussion of this issue.
+   ;; [1] https://github.com/reagent-project/reagent/issues/18
    (list [:thead
-          [:tr (for [[_ label] header]
-                 [:th label])]]
+          [:tr (doall
+                (for [colkey (keys spec)]
+                  [:th (get-in spec [colkey :label])]))]]
          [:tbody
-          (for [row @rows]
-            [:tr (for [[key _] header]
-                   [:td (get row key)])])])])
+          (for [row rows]
+            [:tr (doall
+                  (for [colkey (keys spec)]
+                    [:td (let [data-fn (or (get-in spec [colkey :data-fn])
+                                           identity)]
+                           (data-fn (get row colkey)))]))])])])
 
 ;; ------------------------------------------------ top level components --- ;;
 
@@ -53,8 +66,12 @@
   (component:text-input-action (fn [s]
                                  (.debug js/console
                                          (str "Fetching details for sample " s))
-                                 (reset! target (or (get-in db [:samples s]) [])))
+                                 (reset! target {:id s :stages (or (get-in db [:samples s]) [])}))
                                "Sample ID"))
+
+(defn component:sample-stage-table
+  [spec state]
+  [component:table spec (:stages @state)])
 
 ;; --------------------------------------------------------- entry point --- ;;
 
@@ -65,10 +82,21 @@
 (defn main []
   (add-component [component:status-bar] "status-bar")
 
-  (let [sample-stages (reagent/atom [])]
-    (add-component [component:sample-search sample-stages] "sample-search-bar")
-    (let [header {:id "#"
-                  :method "Method"
-                  :annotation "Annotation"
-                  :xref "Cross reference"}]
-      (add-component [component:table header sample-stages] "sample-tests-table"))))
+  (let [sample-state (reagent/atom {:id nil :stages []})]
+    (add-component [component:sample-search sample-state] "sample-search-bar")
+    (let [spec {:method-id
+                {:label "Method"
+                 :data-fn (fn [x]
+                            (:name (get sample-methods x)))}
+                :annotation
+                {:label "Annotation"}
+                :xref
+                {:label "Cross reference"}
+                :id
+                {:label ""
+                 :data-fn (fn [id]
+                            (let [s-id (:id @sample-state)]
+                              [:button.btn.btn-default {:type "button"
+                                                        :on-click #(.debug js/console (cljs.pprint/cl-format nil "retrieving details of stage ~a for sample ~a" id s-id))}
+                               [:span.glyphicon.glyphicon-expand]]))}}]
+      (add-component [component:sample-stage-table spec sample-state] "sample-tests-table"))))
