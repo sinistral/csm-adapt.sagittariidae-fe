@@ -22,12 +22,14 @@
   [action placeholder]
   (let [state (reagent/atom nil)]
     [:div.input-group
-     [:input.form-control {:type "text"
-                           :placeholder placeholder
-                           :on-change #(reset! state (-> % .-target .-value))}]
+     [:input.form-control
+      {:type "text"
+       :placeholder placeholder
+       :on-change #(reset! state (-> % .-target .-value))}]
      [:span.input-group-btn
-      [:button.btn.btn-default {:type "button"
-                                :on-click #(action @state)}
+      [:button.btn.btn-default
+       {:type "button"
+        :on-click #(action @state)}
        [:span.glyphicon.glyphicon-download]]]]))
 
 (defn component:table
@@ -102,8 +104,9 @@
           id-data-fn
           (fn [stage-id]
             (let [sample-id (:id @sample-state)]
-              [:button.btn.btn-default {:type "button"
-                                        :on-click #(id-btn-action sample-id stage-id)}
+              [:button.btn.btn-default
+               {:type "button"
+                :on-click #(id-btn-action sample-id stage-id)}
                [:span.glyphicon.glyphicon-expand]]))
           spec
           {:method-id {:label "Method" :data-fn method-data-fn}
