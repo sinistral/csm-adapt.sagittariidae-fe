@@ -10,7 +10,7 @@
 
 (defn null-sample-state
   []
-  {:id nil :stages []})
+  {:id nil :stages [] :selected-stage nil})
 
 (defn null-sample-stage-detail-state
   []
@@ -33,7 +33,7 @@
        [:span.glyphicon.glyphicon-download]]]]))
 
 (defn component:table
-  [spec rows]
+  [spec rows context]
   [:table.table.table-condensed.table-striped.table-hover
    ;; Note: Attempting to deref a Reagent atom inside a lazy seq can cause
    ;; problems, because the execution context could move from the component in
@@ -54,7 +54,7 @@
                   (for [colkey (keys spec)]
                     [:td (let [data-fn (or (get-in spec [colkey :data-fn])
                                            identity)]
-                           (data-fn (get row colkey)))]))])])])
+                           (data-fn (get row colkey) context))]))])])])
 
 ;; ------------------------------------------------ top level components --- ;;
 
@@ -73,7 +73,7 @@
 
 (defn component:sample-stage-table
   [spec state]
-  [component:table spec (:stages @state)])
+  [component:table spec (:stages @state) (dissoc @state :id :stages)])
 
 (defn component:sample-stage-details-table
   [spec state]
@@ -98,13 +98,19 @@
           id-btn-action
           (fn [sample-id stage-id]
             (.debug js/console (cl-format nil "Retrieving details of stage ~a for sample ~a" stage-id sample-id))
+            ;; DANGER WILL ROBINSON: Non-atomic swap of multiple state
+            ;; elements.  Is this an argument for storing all application state
+            ;; in a single ref?
+            (swap! sample-state #(assoc % :selected-stage stage-id))
             (reset! sample-stage-detail-state
                     {:stage-id stage-id
                      :stage-details (be/stage-details nil sample-id stage-id)}))
           id-data-fn
-          (fn [stage-id]
+          (fn [stage-id context]
             (let [sample-id (:id @sample-state)]
-              [:button.btn.btn-default
+              [(if (= (:selected-stage context) stage-id)
+                 :button.btn.btn-success
+                 :button.btn.btn-default)
                {:type "button"
                 :on-click #(id-btn-action sample-id stage-id)}
                [:span.glyphicon.glyphicon-expand]]))
