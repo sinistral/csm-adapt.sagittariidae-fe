@@ -12,10 +12,17 @@
    :methods {0 {:name "X-ray tomography" :type :scan}
              1 {:name "Compression" :type :physical}
              2 {:name "Strain" :type :physical}
-             3 {:name "Porosity" :type :analysis}}})
+             3 {:name "Porosity" :type :analysis}}
+   :projects {0 "Inconel"
+              1 "Manhattan"
+              2 "Van Buren"}})
 
 (defonce ^{:private true} sample-methods
   (:methods db))
+
+(defn projects
+  []
+  (get db :projects))
 
 (defn sample-stages
   [project-id sample-id]

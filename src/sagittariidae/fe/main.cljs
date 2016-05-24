@@ -79,6 +79,37 @@
   [spec state]
   [component:table spec (:stage-details @state)])
 
+(defn- make-project-dropdown
+  [dropdown-btn dropdown-lst]
+  ;; This is an ugly, ugly hack.  Eseentially this duplicates the layout and
+  ;; styling already in the HTML.  Replacing just the structural elements (the
+  ;; button and dropdown) has strange effects on the layout (seemingly because
+  ;; of ReactJS insertions). Unfortunately, even when duplicating the layout,
+  ;; the layout doesn't match the bare HTML, hence the need for explicit
+  ;; padding ... Yuck!
+  [:ul.nav.navbar-nav.navbar-right {:style {:padding-right "15px"}}
+   [:li.dropdown
+    [:a.dropdown-toggle {:data-toggle "dropdown"
+                         :role "button"
+                         :aria-haspopup "true" :aria-expanded "false"
+                         :href "#"}
+     dropdown-btn]
+    [:ul.dropdown-menu
+     dropdown-lst]]])
+
+(defn component:project-dropdown
+  []
+  (make-project-dropdown
+   '([:span {:id "project-dropdown-button-text"
+             :style {:padding-right "4px"}} "Project"]
+     [:span.caret])
+   (for [[id name] (be/projects)]
+     [:li [:a {:href "#"
+               :on-click (fn [_]
+                           (set! (.-innerHTML (.getElementById js/document "project-dropdown-button-text"))
+                                 (str "Project: " name)))}
+           name]])))
+
 ;; --------------------------------------------------------- entry point --- ;;
 
 (defn add-component
@@ -92,6 +123,8 @@
         sample-stage-detail-state (reagent/atom (null-sample-stage-detail-state))]
     (add-component [component:sample-search sample-state sample-stage-detail-state]
                    "sample-search-bar")
+    (add-component [component:project-dropdown]
+                   "nav-project-dropdown")
     (let [method-data-fn
           (fn [x]
             (:name (get (be/stage-methods) x)))
