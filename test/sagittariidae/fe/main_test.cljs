@@ -1,5 +1,5 @@
 
-(ns app.main-test
+(ns sagittariidae.fe.main-test
   (:require [cljs.test :refer-macros [deftest testing is]]))
 
 (deftest silly-test

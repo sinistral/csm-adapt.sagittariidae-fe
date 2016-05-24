@@ -1,5 +1,5 @@
 
-(ns app.main)
+(ns sagittariidae.fe.main)
 
 (defn main []
   (let [c (.. js/document (createElement "DIV"))]

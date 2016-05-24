@@ -1,5 +1,5 @@
 
-(ns app.upload
+(ns sagittariidae.fe.upload
   (:require [clojure.string :as str]
             [cljs.pprint :refer [cl-format]]))
 
@@ -31,7 +31,7 @@
     (let [doc js/document
           res (js/Resumable. {:target "/upload" :testChunks true})]
       ;; Sanity checking CLJS reload
-      (.. doc (getElementById "random") (appendChild c))
+      (.. doc (getElementById "random") (sagittariidae.fe.ndChild c))
       ;; Set up Resumable
       (.assignBrowse res (.getElementById doc "add-file-btn"))
       (set! (.-onclick (.getElementById doc "start-upload-btn"))

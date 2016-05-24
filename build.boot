@@ -74,7 +74,7 @@
         (serve)
         (watch)
         (speak)
-        (reload :ids #{id} :on-jsload (symbol (str "app." id) "main"))
+        (reload :ids #{id} :on-jsload (symbol (str "sagittariidae.fe." id) "main"))
         (cljs-repl :ids #{id})
         (cljs :ids #{id} :source-map true :optimizations :none)))
 
