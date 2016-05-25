@@ -1,10 +1,15 @@
 
 (ns sagittariidae.fe.main
-  (:require [clojure.string :as str]
-            [cljs.pprint :refer [cl-format]]
+  (:require [cljs.pprint :refer [cl-format]]
+            [re-frame.core :refer [dispatch subscribe]]
             [reagent.core :as reagent]
-            [cljsjs.react-bootstrap]
-            [sagittariidae.fe.backend :as be]))
+            [sagittariidae.fe.backend :as be]
+            [sagittariidae.fe.state :as state]
+            ;; The following namespaces aren't explictly used, but must be
+            ;; required to ensure that depdendent functionality (such as event
+            ;; handlers) is made available.
+            [sagittariidae.fe.event]
+            [cljsjs.react-bootstrap]))
 
 ;; --------------------------------------------------------------- state --- ;;
 
@@ -89,26 +94,30 @@
   ;; padding ... Yuck!
   [:ul.nav.navbar-nav.navbar-right {:style {:padding-right "15px"}}
    [:li.dropdown
-    [:a.dropdown-toggle {:data-toggle "dropdown"
-                         :role "button"
-                         :aria-haspopup "true" :aria-expanded "false"
-                         :href "#"}
+    [:a.dropdown-toggle {:data-toggle   "dropdown"
+                         :role          "button"
+                         :aria-haspopup "true"
+                         :aria-expanded "false"
+                         :href          "#"}
      dropdown-btn]
     [:ul.dropdown-menu
      dropdown-lst]]])
 
 (defn component:project-dropdown
   []
-  (make-project-dropdown
-   '([:span {:id "project-dropdown-button-text"
-             :style {:padding-right "4px"}} "Project"]
-     [:span.caret])
-   (for [[id name] (be/projects)]
-     [:li [:a {:href "#"
-               :on-click (fn [_]
-                           (set! (.-innerHTML (.getElementById js/document "project-dropdown-button-text"))
-                                 (str "Project: " name)))}
-           name]])))
+  (let [project-id (subscribe [:query/project-id])]
+    (fn []
+      (make-project-dropdown
+       (list [:span {:id    "project-dropdown-button-text"
+                     :style {:padding-right "4px"}}
+              (if (nil? (:id @project-id))
+                "Project"
+                (str "Project: " (:name @project-id)))]
+              [:span.caret])
+       (for [[id name] (be/projects)]
+         [:li [:a {:href     "#"
+                   :on-click #(dispatch [:event/project-selected id name])}
+               name]])))))
 
 ;; --------------------------------------------------------- entry point --- ;;
 

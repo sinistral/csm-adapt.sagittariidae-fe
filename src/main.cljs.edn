@@ -1,3 +1,6 @@
-{:require  [sagittariidae.fe.main sagittariidae.fe.backend]
+{:require  [sagittariidae.fe.main
+            sagittariidae.fe.backend
+            sagittariidae.fe.event
+            sagittariidae.fe.state]
  :init-fns [sagittariidae.fe.main/main]
  :compiler-options {}}
