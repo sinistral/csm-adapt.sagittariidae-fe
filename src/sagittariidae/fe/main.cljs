@@ -1,7 +1,7 @@
 
 (ns sagittariidae.fe.main
   (:require [re-frame.core :refer [dispatch subscribe]]
-            [reagent.core :as reagent]
+            [reagent.core :refer [render-component]]
             [sagittariidae.fe.backend :as be]
             [sagittariidae.fe.state :as state]
             ;; The following namespaces aren't explictly used, but must be
@@ -9,16 +9,6 @@
             ;; handlers) is made available.
             [sagittariidae.fe.event]
             [cljsjs.react-bootstrap]))
-
-;; --------------------------------------------------------------- state --- ;;
-
-(defn null-sample-state
-  []
-  {:id nil :stages [] :selected-stage nil})
-
-(defn null-sample-stage-detail-state
-  []
-  {:stage-id nil :stage-details []})
 
 ;; ----------------------------------------------- composable components --- ;;
 
@@ -110,9 +100,13 @@
              :btn        {:label ""                :data-fn btn-data-fn}}]
         [component:table spec (:stages @sample-stages)]))))
 
-(defn component:sample-stage-details-table
-  [spec state]
-  [component:table spec (:stage-details @state)])
+(defn component:sample-stage-detail-table
+  []
+  (let [sample-stage-detail (subscribe [:query/sample-stage-detail])]
+    (fn []
+      (let [spec {:file   {:label "File"}
+                  :status {:label "Status" :data-fn (fn [x _] (name x))}}]
+        [component:table spec (:file-spec @sample-stage-detail)]))))
 
 (defn- make-project-dropdown
   [dropdown-btn dropdown-lst]
@@ -151,20 +145,13 @@
 
 ;; --------------------------------------------------------- entry point --- ;;
 
-(defn add-component
+(defn- add-component
   [c el]
-  (reagent/render-component c (.getElementById js/document el)))
+  (render-component c (.getElementById js/document el)))
 
 (defn main []
   (add-component [component:status-bar] "status-bar")
-
-  (let [sample-state (reagent/atom (null-sample-state))
-        sample-stage-detail-state (reagent/atom (null-sample-stage-detail-state))]
-    (add-component [component:sample-search] "sample-search-bar")
-    (add-component [component:project-dropdown] "nav-project-dropdown")
-    (add-component [component:sample-stage-table] "sample-detail-table")
-    (let [spec
-          {:file {:label "File"}
-           :status {:label "Status" :data-fn str}}]
-      (add-component [component:sample-stage-details-table spec sample-stage-detail-state]
-                     "sample-stage-detail-table"))))
+  (add-component [component:sample-search] "sample-search-bar")
+  (add-component [component:project-dropdown] "nav-project-dropdown")
+  (add-component [component:sample-stage-table] "sample-detail-table")
+  (add-component [component:sample-stage-detail-table] "sample-stage-detail-table"))
