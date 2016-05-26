@@ -1,7 +1,6 @@
 
 (ns sagittariidae.fe.main
-  (:require [cljs.pprint :refer [cl-format]]
-            [re-frame.core :refer [dispatch subscribe]]
+  (:require [re-frame.core :refer [dispatch subscribe]]
             [reagent.core :as reagent]
             [sagittariidae.fe.backend :as be]
             [sagittariidae.fe.state :as state]
@@ -37,8 +36,18 @@
       :on-click   #(on-click)}
      [:span.glyphicon.glyphicon-download]]]])
 
-(defn component:table
-  [spec rows context]
+(defn- component:table
+  "A generalised component for building rendering tables.  The table content is
+  described by `spec`, a map of the form:
+  ```
+  {:column-name {:label \"RenderName\" :data-fn #(transform %)} ...}
+  ```
+  Note that while this is arguably an ugly hack, it is convenient for us to
+  assume that our table spec is defined as a literal map (rather than being
+  programmatically constructed) and that it contains a small number of
+  columns (< 9).  Clojure(Script) optimises such maps to PersistentArrayMaps
+  which preserve their insertion order."
+  [spec rows]
   [:table.table.table-condensed.table-striped.table-hover
    ;; Note: Attempting to deref a Reagent atom inside a lazy seq can cause
    ;; problems, because the execution context could move from the component in
@@ -47,8 +56,8 @@
    ;; until the `:tr` is expanded, at which point the atom no longer knows that
    ;; the intent was to have it deref'd in this component.
    ;;
-   ;; See [1] for a more detailed discussion of this issue.
-   ;; [1] https://github.com/reagent-project/reagent/issues/18
+   ;; See the following issue for a more detailed discussion of this issue:
+   ;; https://github.com/reagent-project/reagent/issues/18
    (list [:thead
           [:tr (doall
                 (for [colkey (keys spec)]
@@ -57,9 +66,9 @@
           (for [row rows]
             [:tr (doall
                   (for [colkey (keys spec)]
-                    [:td (let [data-fn (or (get-in spec [colkey :data-fn])
-                                           identity)]
-                           (data-fn (get row colkey) context))]))])])])
+                    (let [data-fn (or (get-in spec [colkey :data-fn])
+                                      (fn [x _] x))]
+                      [:td (data-fn (get row colkey) row)])))])])])
 
 ;; ------------------------------------------------ top level components --- ;;
 
@@ -79,8 +88,27 @@
                                      click)))))
 
 (defn component:sample-stage-table
-  [spec state]
-  [component:table spec (:stages @state) (dissoc @state :id :stages)])
+  []
+  (let [sample-stages (subscribe [:query/sample-stages])]
+    (fn []
+      (let [method-data-fn
+            (fn [x]
+              (:name (get (be/stage-methods) x)))
+            btn-data-fn
+            (fn [_ {:keys [id]}]
+              [(if (= (:active @sample-stages) id)
+                 :button.btn.btn-success
+                 :button.btn.btn-default)
+               {:type     "button"
+                :on-click #(dispatch [:event/stage-selected id])}
+               [:span.glyphicon.glyphicon-chevron-right]])
+            spec
+            {:id         {:label "#"}
+             :method-id  {:label "Method"          :data-fn method-data-fn}
+             :annotation {:label "Annotation"}
+             :xref       {:label "Cross reference"}
+             :btn        {:label ""                :data-fn btn-data-fn}}]
+        [component:table spec (:stages @sample-stages)]))))
 
 (defn component:sample-stage-details-table
   [spec state]
@@ -134,35 +162,7 @@
         sample-stage-detail-state (reagent/atom (null-sample-stage-detail-state))]
     (add-component [component:sample-search] "sample-search-bar")
     (add-component [component:project-dropdown] "nav-project-dropdown")
-    (let [method-data-fn
-          (fn [x]
-            (:name (get (be/stage-methods) x)))
-          id-btn-action
-          (fn [sample-id stage-id]
-            (.debug js/console (cl-format nil "Retrieving details of stage ~a for sample ~a" stage-id sample-id))
-            ;; DANGER WILL ROBINSON: Non-atomic swap of multiple state
-            ;; elements.  Is this an argument for storing all application state
-            ;; in a single ref?
-            (swap! sample-state #(assoc % :selected-stage stage-id))
-            (reset! sample-stage-detail-state
-                    {:stage-id stage-id
-                     :stage-details (be/stage-details nil sample-id stage-id)}))
-          id-data-fn
-          (fn [stage-id context]
-            (let [sample-id (:id @sample-state)]
-              [(if (= (:selected-stage context) stage-id)
-                 :button.btn.btn-success
-                 :button.btn.btn-default)
-               {:type "button"
-                :on-click #(id-btn-action sample-id stage-id)}
-               [:span.glyphicon.glyphicon-expand]]))
-          spec
-          {:method-id {:label "Method" :data-fn method-data-fn}
-           :annotation {:label "Annotation"}
-           :xref {:label "Cross reference"}
-           :id {:label "" :data-fn id-data-fn}}]
-      (add-component [component:sample-stage-table spec sample-state]
-                     "sample-detail-table"))
+    (add-component [component:sample-stage-table] "sample-detail-table")
     (let [spec
           {:file {:label "File"}
            :status {:label "Status" :data-fn str}}]
