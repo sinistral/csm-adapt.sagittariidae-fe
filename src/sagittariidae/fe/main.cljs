@@ -2,8 +2,8 @@
 (ns sagittariidae.fe.main
   (:require [re-frame.core :refer [dispatch subscribe]]
             [reagent.core :refer [render-component]]
-            [sagittariidae.fe.backend :as be]
-            [sagittariidae.fe.state :as state]
+            [sagittariidae.fe.backend :as b]
+            [sagittariidae.fe.reagent-utils :as u]
             ;; The following namespaces aren't explictly used, but must be
             ;; required to ensure that depdendent functionality (such as event
             ;; handlers) is made available.
@@ -48,17 +48,30 @@
    ;;
    ;; See the following issue for a more detailed discussion of this issue:
    ;; https://github.com/reagent-project/reagent/issues/18
-   (list [:thead
-          [:tr (doall
-                (for [colkey (keys spec)]
-                  [:th (get-in spec [colkey :label])]))]]
-         [:tbody
-          (for [row rows]
-            [:tr (doall
-                  (for [colkey (keys spec)]
-                    (let [data-fn (or (get-in spec [colkey :data-fn])
-                                      (fn [x _] x))]
-                      [:td (data-fn (get row colkey) row)])))])])])
+   (u/key
+    (list
+     [:thead
+      [:tr (doall
+            (for [colkey (keys spec)]
+              (let [label (get-in spec [colkey :label])]
+                ^{:key label}
+                [:th label])))]]
+     [:tbody
+      (doall
+       (for [row rows]
+         (do
+           ;; We require every row in the table data to have an ID.  This
+           ;; should should be an *identity* for the row, and not simply a row
+           ;; index.  This will be used to provide the child key needed by
+           ;; ReactJS.
+           (when-not (:id row)
+             (throw (ex-info "No `:id` found in row data; this is required to provide the required ReactJS `key` for dynamically generated children, and must provide an *identity* for the row, not just an index." row)))
+           ^{:key (:id row)}
+           [:tr (doall
+                 (for [colkey (keys spec)]
+                   (let [data-fn (or (get-in spec [colkey :data-fn]) (fn [x _] x))]
+                     ^{:key colkey}
+                     [:td (data-fn (get row colkey) row)])))])))]))])
 
 ;; ------------------------------------------------ top level components --- ;;
 
@@ -83,7 +96,7 @@
     (fn []
       (let [method-data-fn
             (fn [x]
-              (:name (get (be/stage-methods) x)))
+              (:name (get (b/stage-methods) x)))
             btn-data-fn
             (fn [_ {:keys [id]}]
               [(if (= (:active @sample-stages) id)
@@ -132,13 +145,16 @@
   (let [project-id (subscribe [:query/project-id])]
     (fn []
       (make-project-dropdown
-       (list [:span {:id    "project-dropdown-button-text"
-                     :style {:padding-right "4px"}}
-              (if (nil? (:id @project-id))
-                "Project"
-                (str "Project: " (:name @project-id)))]
-              [:span.caret])
-       (for [[id name] (be/projects)]
+       (u/key
+        (list
+         [:span {:id    "project-dropdown-button-text"
+                 :style {:padding-right "4px"}}
+          (if (nil? (:id @project-id))
+            "Project"
+            (str "Project: " (:name @project-id)))]
+         [:span.caret]))
+       (for [[id name] (b/projects)]
+         ^{:key id}
          [:li [:a {:href     "#"
                    :on-click #(dispatch [:event/project-selected id name])}
                name]])))))

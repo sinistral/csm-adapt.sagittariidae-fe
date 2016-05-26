@@ -1,6 +1,7 @@
 {:require  [sagittariidae.fe.main
             sagittariidae.fe.backend
             sagittariidae.fe.event
+            sagittariidae.fe.reagent-utils
             sagittariidae.fe.state]
  :init-fns [sagittariidae.fe.main/main]
  :compiler-options {}}
