@@ -24,18 +24,18 @@
 ;; ----------------------------------------------- composable components --- ;;
 
 (defn component:text-input-action
-  [action placeholder]
-  (let [state (reagent/atom nil)]
-    [:div.input-group
-     [:input.form-control
-      {:type "text"
-       :placeholder placeholder
-       :on-change #(reset! state (-> % .-target .-value))}]
-     [:span.input-group-btn
-      [:button.btn.btn-default
-       {:type "button"
-        :on-click #(action @state)}
-       [:span.glyphicon.glyphicon-download]]]]))
+  [placeholder value on-change on-click]
+  [:div.input-group
+   [:input.form-control
+    {:type        "text"
+     :placeholder placeholder
+     :value       value
+     :on-change   #(on-change (-> % .-target .-value))}]
+   [:span.input-group-btn
+    [:button.btn.btn-default
+     {:type       "button"
+      :on-click   #(on-click)}
+     [:span.glyphicon.glyphicon-download]]]])
 
 (defn component:table
   [spec rows context]
@@ -68,13 +68,15 @@
   [:div [:p "Hello, " [:span {:style {:color "red"}} "World"]]])
 
 (defn component:sample-search
-  [sample-detail sample-stage-detail]
-  (letfn [(button-action [sample-id]
-            (reset! sample-detail (null-sample-state))
-            (reset! sample-stage-detail (null-sample-stage-detail-state))
-            (.debug js/console (str "Fetching details for sample " sample-id))
-            (reset! sample-detail {:id sample-id :stages (be/sample-stages nil sample-id)}))]
-    (component:text-input-action button-action "Sample ID")))
+  []
+  (let [sample-id (subscribe [:query/sample-id])]
+    (fn []
+      (let [change #(dispatch [:event/sample-id-changed %])
+            click #(dispatch [:event/sample-id-search-requested])]
+        (component:text-input-action "Search for a sample ..."
+                                     @sample-id
+                                     change
+                                     click)))))
 
 (defn component:sample-stage-table
   [spec state]
@@ -130,10 +132,8 @@
 
   (let [sample-state (reagent/atom (null-sample-state))
         sample-stage-detail-state (reagent/atom (null-sample-stage-detail-state))]
-    (add-component [component:sample-search sample-state sample-stage-detail-state]
-                   "sample-search-bar")
-    (add-component [component:project-dropdown]
-                   "nav-project-dropdown")
+    (add-component [component:sample-search] "sample-search-bar")
+    (add-component [component:project-dropdown] "nav-project-dropdown")
     (let [method-data-fn
           (fn [x]
             (:name (get (be/stage-methods) x)))
