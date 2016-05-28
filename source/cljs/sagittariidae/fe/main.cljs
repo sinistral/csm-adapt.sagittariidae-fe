@@ -1,7 +1,7 @@
 
 (ns sagittariidae.fe.main
   (:require [re-frame.core :refer [dispatch subscribe]]
-            [reagent.core :refer [render-component]]
+            [reagent.core :refer [render]]
             [sagittariidae.fe.backend :as b]
             [sagittariidae.fe.reagent-utils :as u]
             ;; The following namespaces aren't explictly used, but must be
@@ -163,7 +163,7 @@
 
 (defn- add-component
   [c el]
-  (render-component c (.getElementById js/document el)))
+  (render c (.getElementById js/document el)))
 
 (defn main []
   (add-component [component:status-bar] "status-bar")
