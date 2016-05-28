@@ -12,20 +12,6 @@
 
 ;; ----------------------------------------------- composable components --- ;;
 
-(defn component:text-input-action
-  [placeholder value on-change on-click]
-  [:div.input-group
-   [:input.form-control
-    {:type        "text"
-     :placeholder placeholder
-     :value       value
-     :on-change   #(on-change (-> % .-target .-value))}]
-   [:span.input-group-btn
-    [:button.btn.btn-default
-     {:type       "button"
-      :on-click   #(on-click)}
-     [:span.glyphicon.glyphicon-download]]]])
-
 (defn- component:table
   "A generalised component for building rendering tables.  The table content is
   described by `spec`, a map of the form:
@@ -73,11 +59,21 @@
                      ^{:key colkey}
                      [:td (data-fn (get row colkey) row)])))])))]))])
 
-;; ------------------------------------------------ top level components --- ;;
+(defn component:text-input-action
+  [placeholder value on-change on-click]
+  [:div.input-group
+   [:input.form-control
+    {:type        "text"
+     :placeholder placeholder
+     :value       value
+     :on-change   #(on-change (-> % .-target .-value))}]
+   [:span.input-group-btn
+    [:button.btn.btn-default
+     {:type       "button"
+      :on-click   #(on-click)}
+     [:span.glyphicon.glyphicon-download]]]])
 
-(defn component:status-bar
-  []
-  [:div [:p "Hello, " [:span {:style {:color "red"}} "World"]]])
+;; ------------------------------------------------ top level components --- ;;
 
 (defn component:sample-search
   []
@@ -89,6 +85,14 @@
                                      @sample-id
                                      change
                                      click)))))
+
+(defn component:sample-stage-detail-table
+  []
+  (let [sample-stage-detail (subscribe [:query/sample-stage-detail])]
+    (fn []
+      (let [spec {:file   {:label "File"}
+                  :status {:label "Status" :data-fn (fn [x _] (name x))}}]
+        [component:table spec (:file-spec @sample-stage-detail)]))))
 
 (defn component:sample-stage-table
   []
@@ -112,14 +116,6 @@
              :xref       {:label "Cross reference"}
              :btn        {:label ""                :data-fn btn-data-fn}}]
         [component:table spec (:stages @sample-stages)]))))
-
-(defn component:sample-stage-detail-table
-  []
-  (let [sample-stage-detail (subscribe [:query/sample-stage-detail])]
-    (fn []
-      (let [spec {:file   {:label "File"}
-                  :status {:label "Status" :data-fn (fn [x _] (name x))}}]
-        [component:table spec (:file-spec @sample-stage-detail)]))))
 
 (defn- make-project-dropdown
   [dropdown-btn dropdown-lst]
@@ -159,6 +155,10 @@
                    :on-click #(dispatch [:event/project-selected id name])}
                name]])))))
 
+(defn component:status-bar
+  []
+  [:div [:p "Hello, " [:span {:style {:color "red"}} "World"]]])
+
 ;; --------------------------------------------------------- entry point --- ;;
 
 (defn- add-component
@@ -167,7 +167,7 @@
 
 (defn main []
   (add-component [component:status-bar] "status-bar")
-  (add-component [component:sample-search] "sample-search-bar")
   (add-component [component:project-dropdown] "nav-project-dropdown")
+  (add-component [component:sample-search] "sample-search-bar")
   (add-component [component:sample-stage-table] "sample-detail-table")
   (add-component [component:sample-stage-detail-table] "sample-stage-detail-table"))
