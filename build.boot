@@ -1,33 +1,80 @@
 
-(set-env!
- :dependencies '[;; Project dependencies.
-                 [org.clojure/clojure         "1.7.0"]
-                 [org.clojure/clojurescript   "1.7.228"]
-                 [re-frame                    "0.7.0"]
-                 [reagent                     "0.6.0-alpha"]
-                 [cljsjs/react-bootstrap      "0.29.2-0"]
-                 ;; Build and REPL dependencies.
-                 [adzerk/boot-cljs            "1.7.228-1"      :scope "test"]
-                 [adzerk/boot-cljs-repl       "0.3.0"          :scope "test"]
-                 [adzerk/boot-reload          "0.4.5"          :scope "test"]
-                 [pandeiro/boot-http          "0.7.1-SNAPSHOT" :scope "test"]
-                 [crisptrutski/boot-cljs-test "0.2.2-SNAPSHOT" :scope "test"]
-                 [com.cemerick/piggieback     "0.2.1"          :scope "test"]
-                 [weasel                      "0.7.0"          :scope "test"]
-                 [org.clojure/tools.nrepl     "0.2.12"         :scope "test"]])
+(defn- scope-dependency
+  [scope spec]
+  (let [[p v & opt-lst] spec
+        opts (apply hash-map opt-lst)]
+    (vec (concat [p v] (reduce concat (assoc opts :scope scope))))))
+
+(defn- scope-dependencies
+  [scope specs]
+  (vec (map #(scope-dependency scope %) specs)))
+
+(defn- dependencies
+  "Convert a leiningen-like dependency map into a boot dependency vector.  Map
+  keys are the build stage, and values are vectors of the standard
+  dependency [name version] tuple, e.g.:
+  ```
+    {:build '[[org.clojure/clojure \"1.7.0\"]
+              ...]
+     :dev   '[[org.slf5j/slf4j-nop \"1.7.13\"]]}
+  ```
+  This example highlights another feature: build stage synonyms.  It can be
+  (conceptually, if not practically) useful to distinguish between dependencies
+  that provide development infrastrcture (REPL utils), and those that support
+  testing (testing frameworks).  Thus `:dev` is a synonym for `:test` and both
+  can be used together in the same definition make this distinction.  For
+  convenience `:build` is a synonym for `compile`."
+  [m]
+  (vec
+   (reduce concat
+           (for [[scope specs] m]
+             (scope-dependencies (cond (= :build scope) "compile"
+                                       (= :dev scope) "test"
+                                       :else (if (keyword? scope) (name scope) (str scope)))
+                                 specs)))))
+
+(set-env! :dependencies
+          (dependencies {:build '[[org.clojure/clojure         "1.7.0"]
+                                  [org.clojure/clojurescript   "1.7.228"]
+                                  [re-frame                    "0.7.0"]
+                                  [reagent                     "0.6.0-alpha"]
+                                  [cljsjs/react-bootstrap      "0.29.2-0"]]
+                         :dev   '[[adzerk/boot-cljs            "1.7.228-1"]
+                                  [adzerk/boot-cljs-repl       "0.3.0"]
+                                  [adzerk/boot-reload          "0.4.8"]
+                                  [degree9/boot-bower          "0.3.0"]
+                                  [deraen/boot-less            "0.5.0"] ;; required by cljsjs/react-bootstrap
+                                  [org.clojure/tools.nrepl     "0.2.12"]
+                                  [org.slf4j/slf4j-nop         "1.7.13"]
+                                  [pandeiro/boot-http          "0.7.3"]
+                                  [crisptrutski/boot-cljs-test "0.2.2-SNAPSHOT"]
+                                  [com.cemerick/piggieback     "0.2.1"]
+                                  [weasel                      "0.7.0"]]}))
 
 (require
-  '[clojure.java.io       :as io]
-  '[boot.util             :refer [info]]
-  '[adzerk.boot-cljs      :refer [cljs main-files]]
-  '[adzerk.boot-cljs-repl :refer [cljs-repl start-repl]]
-  '[adzerk.boot-reload    :refer [reload]]
-  '[crisptrutski.boot-cljs-test  :refer [exit! test-cljs]]
-  '[pandeiro.boot-http    :refer [serve]])
+ '[clojure.java.io             :as    io]
+ '[clojure.string              :as    str]
+ '[boot.util                   :refer [info]]
+ '[adzerk.boot-cljs            :refer [cljs main-files]]
+ '[adzerk.boot-cljs-repl       :refer [cljs-repl start-repl]]
+ '[adzerk.boot-reload          :refer [reload]]
+ '[crisptrutski.boot-cljs-test :refer [exit! test-cljs]]
+ '[degree9.boot-bower          :refer [bower]]
+ '[deraen.boot-less            :refer [less]]
+ '[pandeiro.boot-http          :refer [serve]])
+
+(defn p
+  "Convert a '/' separated path into a one that uses the platform-specific
+  separator.  This is a convenience function that allows paths to be written
+  simply as literal strings using '/' separators."
+  [s]
+  (.getPath (apply io/file (str/split s #"/"))))
 
 (set-env!
- :source-paths #{"src"}
- :resource-paths #{"html" (.getPath (io/file "dep" "bower_components"))})
+ :source-paths #{(p "source/cljs") "cljs-build-config"}
+ :resource-paths (set (map p ["resource/html" "resource/css"])))
+
+;; ---------------------------------------------------------- helper fns --- ;;
 
 (def test-suffix "-test")
 
@@ -55,6 +102,10 @@
           (:require decorated))
     (spit out-file (pr-str decorated))))
 
+;; --------------------------------------------------------------- tasks --- ;;
+
+(def target-dir "target")
+
 (deftask testing
   [i ids IDS #{str} "The IDs of the build to be tested"]
   (with-pre-wrap fileset
@@ -65,26 +116,44 @@
         (commit! (add-resource fileset tmp-dir)))
       fileset)))
 
-(deftask auto-test []
+(deftask install-js-dependencies
+  []
+  (let [js-deps {:bootstrap   "3.3.6"
+                 :resumablejs "1.0.2"}]
+    (comp (bower :install js-deps :directory ".")
+          (sift  :include #{#"^.bowerrc$" #"^bower.json$"} :invert true))))
+
+(deftask auto-test
+  []
   (comp (testing)
         (watch)
         (speak)
         (test-cljs)))
 
-(deftask dev
-  [i id ID str "The ID of the build for which REPL/auto-reload functionality is to be provided"]
-  (comp (testing :ids #{id})
-        (serve)
-        (watch)
-        (speak)
-        (reload :ids #{id} :on-jsload (symbol (str "sagittariidae.fe." id) "main"))
-        (cljs-repl :ids #{id})
-        (cljs :ids #{id} :source-map true :optimizations :none)))
-
-(deftask test []
+(deftask test
+  []
   (comp (testing)
         (test-cljs)
         (exit!)))
 
-(deftask build []
-  (cljs :optimizations :advanced))
+(deftask dev
+  [i id ID str "The ID of the build for which REPL/auto-reload functionality is to be provided"]
+  (comp (install-js-dependencies)
+        (testing   :ids           #{id})
+        (serve)
+        (watch)
+        (speak)
+        (reload    :ids           #{id}
+                   :on-jsload     (symbol (str "sagittariidae.fe." id) "main"))
+        (cljs-repl :ids           #{id})
+        (cljs      :ids           #{id}
+                   :source-map    true
+                   :optimizations :none)))
+
+(deftask build
+  []
+  (comp (install-js-dependencies)
+        (cljs   :ids           "main"
+                :source-map    true
+                :optimizations :simple)
+        (target :directory     #{target-dir})))
