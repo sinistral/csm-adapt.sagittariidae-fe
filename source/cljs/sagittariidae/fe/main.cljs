@@ -1,7 +1,7 @@
 
 (ns sagittariidae.fe.main
   (:require [re-frame.core :refer [dispatch subscribe]]
-            [reagent.core :refer [render]]
+            [reagent.core :refer [adapt-react-class render]]
             [sagittariidae.fe.backend :as b]
             [sagittariidae.fe.reagent-utils :as u]
             ;; The following namespaces aren't explictly used, but must be
@@ -9,6 +9,18 @@
             ;; handlers) is made available.
             [sagittariidae.fe.event]
             [cljsjs.react-bootstrap]))
+
+;; ---------------------------------- adapted react-bootstrap components --- ;;
+
+(defn react-bootstrap->reagent
+  [c]
+  (adapt-react-class (aget js/ReactBootstrap (str c))))
+
+;; Kudos to Nicolò Valigi.
+;; http://nicolovaligi.com/boostrap-components-reagent-clojurescript.html
+
+(def menu-item    (react-bootstrap->reagent 'MenuItem))
+(def nav-dropdown (react-bootstrap->reagent 'NavDropdown))
 
 ;; ----------------------------------------------- composable components --- ;;
 
@@ -117,43 +129,18 @@
              :btn        {:label ""                :data-fn btn-data-fn}}]
         [component:table spec (:stages @sample-stages)]))))
 
-(defn- make-project-dropdown
-  [dropdown-btn dropdown-lst]
-  ;; This is an ugly, ugly hack.  Eseentially this duplicates the layout and
-  ;; styling already in the HTML.  Replacing just the structural elements (the
-  ;; button and dropdown) has strange effects on the layout (seemingly because
-  ;; of ReactJS insertions). Unfortunately, even when duplicating the layout,
-  ;; the layout doesn't match the bare HTML, hence the need for explicit
-  ;; padding ... Yuck!
-  [:ul.nav.navbar-nav.navbar-right {:style {:padding-right "15px"}}
-   [:li.dropdown
-    [:a.dropdown-toggle {:data-toggle   "dropdown"
-                         :role          "button"
-                         :aria-haspopup "true"
-                         :aria-expanded "false"
-                         :href          "#"}
-     dropdown-btn]
-    [:ul.dropdown-menu
-     dropdown-lst]]])
-
 (defn component:project-dropdown
   []
   (let [project-id (subscribe [:query/project-id])]
     (fn []
-      (make-project-dropdown
-       (u/key
-        (list
-         [:span {:id    "project-dropdown-button-text"
-                 :style {:padding-right "4px"}}
-          (if (nil? (:id @project-id))
-            "Project"
-            (str "Project: " (:name @project-id)))]
-         [:span.caret]))
+      [nav-dropdown
+       {:id "nav-project-dropdown"
+        :title (if (nil? (:id @project-id))
+                 "Project"
+                 (str "Project: " (:name @project-id)))}
        (for [[id name] (b/projects)]
-         ^{:key id}
-         [:li [:a {:href     "#"
-                   :on-click #(dispatch [:event/project-selected id name])}
-               name]])))))
+         (let [event [:event/project-selected id name]]
+           ^{:key id} [menu-item {:on-click #(dispatch event)} name]))])))
 
 (defn component:status-bar
   []
