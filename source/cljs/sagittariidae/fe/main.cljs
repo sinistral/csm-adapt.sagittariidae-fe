@@ -170,10 +170,6 @@
          (let [event [:event/project-selected id name]]
            ^{:key id} [menu-item {:on-click #(dispatch event)} name]))])))
 
-(defn component:status-bar
-  []
-  [:div [:p "Hello, " [:span {:style {:color "red"}} "World"]]])
-
 ;; --------------------------------------------------------- entry point --- ;;
 
 (defn- add-component
@@ -182,7 +178,6 @@
 
 (defn main []
   ;; "read-only" components
-  (add-component [component:status-bar] "status-bar")
   (add-component [component:project-dropdown] "nav-project-dropdown")
   (add-component [component:sample-search] "sample-search-bar")
   (add-component [component:sample-stage-table] "sample-detail-table")
