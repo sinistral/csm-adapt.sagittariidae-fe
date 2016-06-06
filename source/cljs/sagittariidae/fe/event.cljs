@@ -5,6 +5,13 @@
             [sagittariidae.fe.backend :as be]
             [sagittariidae.fe.state :refer [null-state]]))
 
+(defn handler:initialising
+  [state _]
+  (if (empty? state)
+    null-state
+    state))
+(register-handler :event/initialising handler:initialising)
+
 (defn handler:project-selected
   [state [_ id name]]
   (assoc null-state :project {:id id :name name}))

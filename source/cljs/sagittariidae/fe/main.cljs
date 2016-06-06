@@ -1,6 +1,6 @@
 
 (ns sagittariidae.fe.main
-  (:require [re-frame.core :refer [dispatch subscribe]]
+  (:require [re-frame.core :refer [dispatch dispatch-sync subscribe]]
             [reagent.core :refer [adapt-react-class render]]
             [sagittariidae.fe.backend :as b]
             [sagittariidae.fe.reagent-utils :as u]
@@ -126,7 +126,7 @@
            [component:select (:value method)]]
           [column {:md 8}
            [form-control {:placeholder "Annotation ..."
-                          :value       (or annotation "")
+                          :value       annotation
                           :type        "text"
                           :on-change   #(dispatch [:event/stage-annotation-changed (-> % .-target .-value)])}]]]
          [row {:style {:padding-top "10px"}}
@@ -177,6 +177,10 @@
   (render c (.getElementById js/document el)))
 
 (defn main []
+  ;; Initialise the application state so that components have sensible defaults
+  ;; for their first render.  Synchronous "dispatch" ensures that the
+  ;; initialisation is complete before any of the components are created.
+  (dispatch-sync [:event/initialising])
   ;; "read-only" components
   (add-component [component:project-dropdown] "nav-project-dropdown")
   (add-component [component:sample-search] "sample-search-bar")
