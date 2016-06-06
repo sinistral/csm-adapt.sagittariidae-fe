@@ -2,6 +2,7 @@
 (ns sagittariidae.fe.main
   (:require [re-frame.core :refer [dispatch dispatch-sync subscribe]]
             [reagent.core :refer [adapt-react-class render]]
+            [reagent.ratom :refer-macros [reaction]]
             [sagittariidae.fe.backend :as b]
             [sagittariidae.fe.reagent-utils :as u]
             ;; The following namespaces aren't explictly used, but must be
@@ -24,6 +25,7 @@
 (def grid          (react-bootstrap->reagent 'Grid))
 (def menu-item     (react-bootstrap->reagent 'MenuItem))
 (def nav-dropdown  (react-bootstrap->reagent 'NavDropdown))
+(def progress-bar  (react-bootstrap->reagent 'ProgressBar))
 (def row           (react-bootstrap->reagent 'Row))
 
 (def select        (adapt-react-class js/Select))
@@ -107,21 +109,6 @@
                                      change
                                      click)))))
 
-(defn component:sample-stage-detail-upload-form
-  []
-  [:div
-   [row
-    [column {:md 12}
-     [form-control {:type        "text"
-                    :placeholder "Add file ..."
-                    :value       ""
-                    :disabled    true}]]]
-   [row {:style {:padding-top "10px"}}
-    [column {:md 1}
-     [button [glyph-icon {:glyph "file"}]]]
-    [column {:md 1}
-     [button [glyph-icon {:glyph "upload"}]]]]])
-
 (defn component:sample-stage-detail-table
   []
   (let [sample-stage-detail (subscribe [:query/sample-stage-detail])]
@@ -129,6 +116,54 @@
       (let [spec {:file   {:label "File"}
                   :status {:label "Status" :data-fn (fn [x _] (name x))}}]
         [component:table spec (:file-spec @sample-stage-detail)]))))
+
+(defn component:sample-stage-detail-upload-add-file-button
+  [id]
+  [button {:id    id
+           :title "Select a file to upload."}
+   [glyph-icon {:glyph "file"}]])
+
+(defn component:sample-stage-detail-upload-upload-file-button
+  [res]
+  [button {:title    "Upload the selected file."
+           :on-click #(.upload res)}
+   [glyph-icon {:glyph "upload"}]])
+
+(defn component:sample-stage-detail-upload-form
+  [btn-add btn-upl]
+  (let [detail     (subscribe [:query/sample-stage-detail])
+        filename   (reaction (if-let [f (get-in @detail [:upload :file])]
+                               (.-fileName f)
+                               ""))
+        prog-n     (reaction (get-in @detail [:upload :progress]))
+        prog-state (reaction (get-in @detail [:upload :state]))
+        prog-style (reaction (if (and (= @prog-state :success) (= @prog-n 1))
+                               :success
+                               :default))]
+    (fn []
+      [:div
+       [row
+        [column {:md 12}
+         [form-control {:type        "text"
+                        :placeholder "Add file ..."
+                        :value       @filename
+                        :disabled    true}]]]
+       [row {:style {:padding-top "10px"}}
+        [column {:md 1}
+         btn-add]
+        [column {:md 1}
+         btn-upl]
+        [column {:md 10}
+         [:div.progress
+          {:id "stage-file-upload-progress"
+           :style {:height "34px"}}
+          [progress-bar (let [attrs {:id      "stage-file-upload-progress-bar"
+                                     :striped (= :default @prog-style)
+                                     :now     (* 100 @prog-n)
+                                     :style   {:height "100%"}}]
+                          (if (= :default @prog-style)
+                            attrs
+                            (assoc attrs :bs-style (name @prog-style))))]]]]])))
 
 (defn component:sample-stage-input-form
   []
@@ -187,16 +222,41 @@
 
 ;; --------------------------------------------------------- entry point --- ;;
 
+(defn- by-id
+  [el]
+  (.getElementById js/document el))
+
 (defn- add-component
   [c el]
-  (render c (.getElementById js/document el)))
+  (render c (by-id el)))
 
 (defn main []
   ;; Initialise the application state so that components have sensible defaults
   ;; for their first render.  Synchronous "dispatch" ensures that the
   ;; initialisation is complete before any of the components are created.
-  (dispatch-sync [:event/initialising])
-  ;; "read-only" components
+  (let [res (js/Resumable. {:target "/upload" :testChunks true})]
+    (dispatch-sync [:event/initialising res])
+    (let [add-id "sample-stage-detail-upload-add-file-button"]
+      (add-component [component:sample-stage-detail-upload-form
+                      [component:sample-stage-detail-upload-add-file-button add-id]
+                      [component:sample-stage-detail-upload-upload-file-button res]]
+                     "sample-stage-detail-upload-form")
+      (doto res
+        ;; Component configuration
+        (.assignBrowse (clj->js [(by-id add-id)]))
+        ;; Callback configuration
+        (.on "complete"
+             (fn []
+               (dispatch [:event/upload-file-complete])))
+        (.on "error"
+             (fn [m f]
+               (dispatch [:event/upload-file-error m])))
+        (.on "fileAdded"
+             (fn [f]
+               (dispatch [:event/upload-file-added f])))
+        (.on "progress"
+             (fn []
+               (dispatch [:event/upload-file-progress-updated (.progress res)]))))))
   (add-component [component:project-dropdown]
                  "nav-project-dropdown")
   (add-component [component:sample-search]
@@ -205,8 +265,5 @@
                  "sample-detail-table")
   (add-component [component:sample-stage-detail-table]
                  "sample-stage-detail-table")
-  ;; mutating components
   (add-component [component:sample-stage-input-form]
-                 "sample-stage-input-form")
-  (add-component [component:sample-stage-detail-upload-form]
-                 "sample-stage-detail-upload-form"))
+                 "sample-stage-input-form"))

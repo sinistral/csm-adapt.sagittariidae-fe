@@ -10,12 +10,21 @@
    :sample {:id nil
             :stages []
             :active-stage {:id nil
-                           :file-spec []}
+                           :file-spec []
+                           :upload {:file nil
+                                    :progress 0.0
+                                    :state :default}}
             :new-stage {:method {}
-                        :annotation ""}}})
+                        :annotation ""}}
+   :resumable nil})
 
 (def state
   (reagent/atom null-state))
+
+(defn clear
+  "Reset the part of the state tree denoted by `path` to its default state."
+  [state path]
+  (assoc-in state path (get-in null-state path)))
 
 (register-sub
  :query/project-id
