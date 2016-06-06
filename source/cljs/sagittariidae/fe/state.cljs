@@ -4,13 +4,15 @@
             [reagent.core :as reagent]
             [reagent.ratom :refer-macros [reaction]]))
 
-(def null-state
+(defonce null-state
   {:project {:id nil
              :name nil}
    :sample {:id nil
             :stages []
             :active-stage {:id nil
-                           :file-spec []}}})
+                           :file-spec []}
+            :new-stage {:method {}
+                        :annotation ""}}})
 
 (def state
   (reagent/atom null-state))
@@ -39,3 +41,9 @@
   (assert (= query-id :query/sample-stage-detail))
   (reaction (get-in @state [:sample :active-stage])))
 (register-sub :query/sample-stage-detail query:sample-stage-detail)
+
+(defn query:sample-stage-input
+  [state [query-id]]
+  (assert (= query-id :query/sample-stage-input))
+  (reaction (get-in @state [:sample :new-stage])))
+(register-sub :query/sample-stage-input query:sample-stage-input)

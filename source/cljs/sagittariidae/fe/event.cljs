@@ -1,6 +1,7 @@
 
 (ns sagittariidae.fe.event
-  (:require [re-frame.core :refer [register-handler]]
+  (:require [clojure.string :refer [trim]]
+            [re-frame.core :refer [register-handler]]
             [sagittariidae.fe.backend :as be]
             [sagittariidae.fe.state :refer [null-state]]))
 
@@ -24,10 +25,36 @@
 (defn handler:stage-selected
   [state [_ stage-id]]
   (let [project-id (get-in state [:project :id])
-        sample-id (get-in state [:sample :id])]
+        sample-id  (get-in state [:sample :id])]
     (-> state
         (assoc-in [:sample :active-stage :id]
                   stage-id)
         (assoc-in [:sample :active-stage :file-spec]
                   (be/stage-details project-id sample-id stage-id)))))
 (register-handler :event/stage-selected handler:stage-selected)
+
+(defn handler:stage-method-selected
+  [state [_ m]]
+  (assoc-in state [:sample :new-stage :method] (js->clj m :keywordize-keys true)))
+(register-handler :event/stage-method-selected handler:stage-method-selected)
+
+(defn handler:stage-annotation-changed
+  [state [_ annotation]]
+  (assoc-in state [:sample :new-stage :annotation] annotation))
+(register-handler :event/stage-annotation-changed handler:stage-annotation-changed)
+
+(defn handler:stage-added
+  [state _]
+  ;; FIXME: This MUST submit an update to the backend!
+  (let [stages     (get-in state [:sample :stages])
+        method-id  (get-in state [:sample :new-stage :method :value])
+        method-ann (trim (or (get-in state [:sample :new-stage :annotation]) ""))]
+    (when (and method-id (not (empty? method-ann)))
+      (-> state
+          (assoc-in [:sample :stages]
+                    (conj stages {:id         (+ 1 (:id (last stages)))
+                                  :method-id  method-id
+                                  :annotation method-ann}))
+          (assoc-in [:sample :new-stage]
+                    (get-in [:sample :new-stage] null-state))))))
+(register-handler :event/stage-added handler:stage-added)

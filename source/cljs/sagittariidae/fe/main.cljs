@@ -65,12 +65,8 @@
       (doall
        (for [row rows]
          (do
-           ;; We require every row in the table data to have an ID.  This
-           ;; should should be an *identity* for the row, and not simply a row
-           ;; index.  This will be used to provide the child key needed by
-           ;; ReactJS.
-           (when-not (:id row)
-             (throw (ex-info "No `:id` found in row data; this is required to provide the required ReactJS `key` for dynamically generated children, and must provide an *identity* for the row, not just an index." row)))
+           (when-not (or (get row :id) (get row (:id-key spec)))
+             (throw (ex-info "No `:id` and no ID key found for row data.  Row data must include an `:id` key, or the table spec must include an `:id-key` (that identifies the row column to use as the ID field); this is required to provide the required ReactJS `key` for dynamically generated children, and must provide an *identity* for the row, not just an index." row)))
            ^{:key (:id row)}
            [:tr (doall
                  (for [colkey (keys spec)]
@@ -91,6 +87,12 @@
      {:type       "button"
       :on-click   #(on-click)}
      [:span.glyphicon.glyphicon-download]]]])
+
+(defn component:select
+  [v]
+  [select {:options   (b/stage-methods)
+           :value     v
+           :on-change #(dispatch [:event/stage-method-selected %])}])
 
 ;; ------------------------------------------------ top level components --- ;;
 
@@ -115,18 +117,22 @@
 
 (defn component:sample-stage-input-form
   []
-  [:div
-   [row
-    [column {:md 4}
-     [select {:options   (b/stage-methods)
-              :value     1}]]
-    [column {:md 8}
-     [form-control {:type        "text"
-                    :placeholder "Annotation ..."}]]]
-   [row {:style {:padding-top "10px"}}
-    [column {:md 2}
-     [button
-      [glyph-icon {:glyph "plus"}]]]]])
+  (let [new-stage (subscribe [:query/sample-stage-input])]
+    (fn []
+      (let [{:keys [method annotation]} @new-stage]
+        [:div
+         [row
+          [column {:md 4}
+           [component:select (:value method)]]
+          [column {:md 8}
+           [form-control {:placeholder "Annotation ..."
+                          :value       (or annotation "")
+                          :type        "text"
+                          :on-change   #(dispatch [:event/stage-annotation-changed (-> % .-target .-value)])}]]]
+         [row {:style {:padding-top "10px"}}
+          [column {:md 2}
+           [button {:on-click #(dispatch [:event/stage-added])}
+            [glyph-icon {:glyph "plus"}]]]]]))))
 
 (defn component:sample-stage-table
   []
