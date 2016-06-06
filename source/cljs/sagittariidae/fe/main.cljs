@@ -107,6 +107,21 @@
                                      change
                                      click)))))
 
+(defn component:sample-stage-detail-upload-form
+  []
+  [:div
+   [row
+    [column {:md 12}
+     [form-control {:type        "text"
+                    :placeholder "Add file ..."
+                    :value       ""
+                    :disabled    true}]]]
+   [row {:style {:padding-top "10px"}}
+    [column {:md 1}
+     [button [glyph-icon {:glyph "file"}]]]
+    [column {:md 1}
+     [button [glyph-icon {:glyph "upload"}]]]]])
+
 (defn component:sample-stage-detail-table
   []
   (let [sample-stage-detail (subscribe [:query/sample-stage-detail])]
@@ -125,9 +140,9 @@
           [column {:md 4}
            [component:select (:value method)]]
           [column {:md 8}
-           [form-control {:placeholder "Annotation ..."
+           [form-control {:type        "text"
+                          :placeholder "Annotation ..."
                           :value       annotation
-                          :type        "text"
                           :on-change   #(dispatch [:event/stage-annotation-changed (-> % .-target .-value)])}]]]
          [row {:style {:padding-top "10px"}}
           [column {:md 2}
@@ -182,9 +197,16 @@
   ;; initialisation is complete before any of the components are created.
   (dispatch-sync [:event/initialising])
   ;; "read-only" components
-  (add-component [component:project-dropdown] "nav-project-dropdown")
-  (add-component [component:sample-search] "sample-search-bar")
-  (add-component [component:sample-stage-table] "sample-detail-table")
-  (add-component [component:sample-stage-detail-table] "sample-stage-detail-table")
+  (add-component [component:project-dropdown]
+                 "nav-project-dropdown")
+  (add-component [component:sample-search]
+                 "sample-search-bar")
+  (add-component [component:sample-stage-table]
+                 "sample-detail-table")
+  (add-component [component:sample-stage-detail-table]
+                 "sample-stage-detail-table")
   ;; mutating components
-  (add-component [component:sample-stage-input-form] "sample-stage-input-form"))
+  (add-component [component:sample-stage-input-form]
+                 "sample-stage-input-form")
+  (add-component [component:sample-stage-detail-upload-form]
+                 "sample-stage-detail-upload-form"))
