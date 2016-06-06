@@ -2,12 +2,23 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <title>Sagittariidae</title>
-    <link href="bootstrap/dist/css/bootstrap.min.css"
-          rel="stylesheet"></link>
+
     <script type="application/javascript"
-            src="jquery/dist/jquery.min.js"></script>
+             src="jquery/dist/jquery.min.js"></script>
+
     <script type="application/javascript"
-            src="bootstrap/dist/js/bootstrap.min.js"></script>
+             src="bootstrap/dist/js/bootstrap.min.js"></script>
+      <link  rel="stylesheet"
+            type="text/css"
+            href="bootstrap/dist/css/bootstrap.min.css"></link>
+
+    <!-- React select has both JavaScript and CSS components.  The dependency
+         on the CLJS library pull in the JavaScript, but we need to reference
+         the CSS expliclit for it to be loaded.
+         cf. https://github.com/cljsjs/packages/wiki/Non-JS-Assets -->
+      <link  rel="stylesheet"
+            type="text/css"
+            href="cljsjs/react-select/common/react-select.inc.css"></link>
   </head>
   <body>
     <div class="container-fluid">
@@ -50,12 +61,12 @@
 
         <div class="row"> <!-- sample detail -->
           <div class="col-md-12" style="padding-top: 20px;">
-            <div class="col-md-offset-0 col-md-6">
+            <div class="col-md-6">
               <div style="max-height: 500px !important; overflow: auto;">
                 <div id="sample-detail-table"></div>
               </div>
             </div>
-            <div class="col-md-offset-0 col-md-6">
+            <div class="col-md-6">
               <div style="max-height: 500px !important; overflow: auto;">
                 <div id="sample-stage-detail-table"></div>
               </div>
@@ -63,42 +74,32 @@
           </div>
         </div> <!-- row: sample detail -->
 
-        <div class="row"> <!-- control bars -->
+        <div class="row" style="padding-top: 20px;"> <!-- control bars -->
           <div class="col-md-12">
-            <div class="col-md-offset-0 col-md-6">
-              <form class="form form-inline dropdown">
-                <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-                  Method
-                  <span class="caret"></span>
-                </button>
-                <ul class="dropdown-menu" aria-labelledby="dropdownMenu3">
-                  <li class="dropdown-header">Scans</li>
-                  <li><a href="#">X-ray tomography</a></li>
-                  <li class="dropdown-header">Physical tests</li>
-                  <li><a href="#">Compression</a></li>
-                  <li><a href="#">Bi-axial strain</a></li>
-                  <li class="dropdown-header">Analysis</li>
-                  <li><a href="#">Porosity analysis</a></li>
-                </ul>
-                <input type="text" class="form-control" placeholder="Annotation"
-                       style="width: 424px">
-                <button class="btn btn-default" type="button">
-                  <span class="glyphicon glyphicon-plus"></span>
-                </button>
-              </form>
+            <div class="col-md-6">
+              <div id="sample-stage-input-form"></div>
             </div>
-            <div class="col-md-offset-0 col-md-6">
-              <form class="form form-inline">
-                <input type="text" class="form-control" placeholder="Add file ..."
-                       style="width: 472px"
-                       disabled>
-                <button class="btn btn-default" type="button">
-                  <span class="glyphicon glyphicon-file"></span>
-                </button>
-                <button class="btn btn-default" type="button">
-                  <span class="glyphicon glyphicon-upload"></span>
-                </button>
-              </form>
+            <div class="col-md-6">
+              <div>
+                <div class="row">
+                  <div class="col-md-12">
+                    <input type="text" class="form-control" placeholder="Add file ..."
+                           disabled>
+                  </div>
+                </div>
+                <div class="row" style="padding-top: 10px">
+                  <div class="col-md-1">
+                    <button class="btn btn-default" type="button">
+                      <span class="glyphicon glyphicon-file"></span>
+                    </button>
+                  </div>
+                  <div class="col-md-1">
+                    <button class="btn btn-default" type="button">
+                      <span class="glyphicon glyphicon-upload"></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div> <!-- row: control bars -->

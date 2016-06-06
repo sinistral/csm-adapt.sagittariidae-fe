@@ -8,19 +8,25 @@
             ;; required to ensure that depdendent functionality (such as event
             ;; handlers) is made available.
             [sagittariidae.fe.event]
-            [cljsjs.react-bootstrap]))
+            [cljsjs.react-bootstrap]
+            [cljsjs.react-select]))
 
-;; ---------------------------------- adapted react-bootstrap components --- ;;
+;; -------------------------------------------------- adapted components --- ;;
 
 (defn react-bootstrap->reagent
   [c]
   (adapt-react-class (aget js/ReactBootstrap (str c))))
 
-;; Kudos to Nicolò Valigi.
-;; http://nicolovaligi.com/boostrap-components-reagent-clojurescript.html
+(def button        (react-bootstrap->reagent 'Button))
+(def column        (react-bootstrap->reagent 'Col))
+(def form-control  (react-bootstrap->reagent 'FormControl))
+(def glyph-icon    (react-bootstrap->reagent 'Glyphicon))
+(def grid          (react-bootstrap->reagent 'Grid))
+(def menu-item     (react-bootstrap->reagent 'MenuItem))
+(def nav-dropdown  (react-bootstrap->reagent 'NavDropdown))
+(def row           (react-bootstrap->reagent 'Row))
 
-(def menu-item    (react-bootstrap->reagent 'MenuItem))
-(def nav-dropdown (react-bootstrap->reagent 'NavDropdown))
+(def select        (adapt-react-class js/Select))
 
 ;; ----------------------------------------------- composable components --- ;;
 
@@ -37,6 +43,7 @@
   which preserve their insertion order."
   [spec rows]
   [:table.table.table-condensed.table-striped.table-hover
+   {:style {:background-color "#fafafa"}}
    ;; Note: Attempting to deref a Reagent atom inside a lazy seq can cause
    ;; problems, because the execution context could move from the component in
    ;; which lazy-deq is created, to the point at which it is expanded.  (In the
@@ -106,6 +113,21 @@
                   :status {:label "Status" :data-fn (fn [x _] (name x))}}]
         [component:table spec (:file-spec @sample-stage-detail)]))))
 
+(defn component:sample-stage-input-form
+  []
+  [:div
+   [row
+    [column {:md 4}
+     [select {:options   (b/stage-methods)
+              :value     1}]]
+    [column {:md 8}
+     [form-control {:type        "text"
+                    :placeholder "Annotation ..."}]]]
+   [row {:style {:padding-top "10px"}}
+    [column {:md 2}
+     [button
+      [glyph-icon {:glyph "plus"}]]]]])
+
 (defn component:sample-stage-table
   []
   (let [sample-stages (subscribe [:query/sample-stages])]
@@ -153,8 +175,11 @@
   (render c (.getElementById js/document el)))
 
 (defn main []
+  ;; "read-only" components
   (add-component [component:status-bar] "status-bar")
   (add-component [component:project-dropdown] "nav-project-dropdown")
   (add-component [component:sample-search] "sample-search-bar")
   (add-component [component:sample-stage-table] "sample-detail-table")
-  (add-component [component:sample-stage-detail-table] "sample-stage-detail-table"))
+  (add-component [component:sample-stage-detail-table] "sample-stage-detail-table")
+  ;; mutating components
+  (add-component [component:sample-stage-input-form] "sample-stage-input-form"))

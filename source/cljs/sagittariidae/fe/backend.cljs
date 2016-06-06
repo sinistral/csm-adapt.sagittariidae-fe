@@ -8,11 +8,11 @@
    :stage-details {"P001-B001-C001-R001:0" [{:id 0 :file "scan-001.scn" :status :ready}
                                             {:id 1 :file "scan-002.scn" :status :ready}
                                             {:id 2 :file "scan-003.scn" :status :ready}]
-                   "P001-B001-C001-R001:1" [{:id 0 :file "strain.dat" :status :processing}]}
-   :methods {0 {:name "X-ray tomography" :type :scan}
-             1 {:name "Compression" :type :physical}
-             2 {:name "Strain" :type :physical}
-             3 {:name "Porosity" :type :analysis}}
+                   "P001-B001-C001-R001:1" [{:id 0 :file "strain.dat"   :status :processing}]}
+   :methods [{:value 0 :label "X-ray tomography" :type :scan}
+             {:value 1 :label "Compression"      :type :physical}
+             {:value 2 :label "Strain"           :type :physical}
+             {:value 3 :label "Porosity"         :type :analysis}]
    :projects {0 "Inconel"
               1 "Manhattan"
               2 "Van Buren"}})
