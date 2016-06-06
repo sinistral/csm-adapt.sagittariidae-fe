@@ -2,56 +2,57 @@
 (ns sagittariidae.fe.event
   (:require [clojure.string :refer [trim]]
             [re-frame.core :refer [register-handler]]
-            [sagittariidae.fe.backend :as be]
+            [sagittariidae.fe.backend :as b]
             [sagittariidae.fe.state :refer [null-state]]))
 
-(defn handler:initialising
-  [state _]
-  (if (empty? state)
-    null-state
-    state))
-(register-handler :event/initialising handler:initialising)
+(register-handler
+ :event/initialising
+ (fn [state _]
+   (if (empty? state)
+     null-state
+     state)))
 
-(defn handler:project-selected
-  [state [_ id name]]
-  (assoc null-state :project {:id id :name name}))
-(register-handler :event/project-selected handler:project-selected)
+(register-handler
+ :event/project-selected
+ (fn [state [_ id name]]
+  (assoc null-state :project {:id id :name name})))
 
-(defn handler:sample-id-changed
-  [state [_ sample-id]]
+(register-handler
+ :event/sample-id-changed
+ (fn [state [_ sample-id]]
   (-> null-state
       (assoc :project (:project state))
-      (assoc-in [:sample :id] sample-id)))
-(register-handler :event/sample-id-changed handler:sample-id-changed)
+      (assoc-in [:sample :id] sample-id))))
 
-(defn handler:sample-id-search-requested
-  [state _]
-  (assoc-in state [:sample :stages] (be/sample-stages nil (get-in state [:sample :id]))))
-(register-handler :event/sample-id-search-requested handler:sample-id-search-requested)
+(register-handler
+ :event/sample-id-search-requested
+ (fn [state _]
+  (assoc-in state [:sample :stages] (b/sample-stages nil (get-in state [:sample :id])))))
 
-(defn handler:stage-selected
-  [state [_ stage-id]]
+(register-handler
+ :event/stage-selected
+ (fn [state [_ stage-id]]
   (let [project-id (get-in state [:project :id])
         sample-id  (get-in state [:sample :id])]
     (-> state
         (assoc-in [:sample :active-stage :id]
                   stage-id)
         (assoc-in [:sample :active-stage :file-spec]
-                  (be/stage-details project-id sample-id stage-id)))))
-(register-handler :event/stage-selected handler:stage-selected)
+                  (b/stage-details project-id sample-id stage-id))))))
 
-(defn handler:stage-method-selected
-  [state [_ m]]
-  (assoc-in state [:sample :new-stage :method] (js->clj m :keywordize-keys true)))
-(register-handler :event/stage-method-selected handler:stage-method-selected)
+(register-handler
+ :event/stage-method-selected
+ (fn [state [_ m]]
+  (assoc-in state [:sample :new-stage :method] (js->clj m :keywordize-keys true))))
 
-(defn handler:stage-annotation-changed
-  [state [_ annotation]]
-  (assoc-in state [:sample :new-stage :annotation] annotation))
-(register-handler :event/stage-annotation-changed handler:stage-annotation-changed)
+(register-handler
+ :event/stage-annotation-changed
+ (fn [state [_ annotation]]
+  (assoc-in state [:sample :new-stage :annotation] annotation)))
 
-(defn handler:stage-added
-  [state _]
+(register-handler
+ :event/stage-added
+ (fn [state _]
   ;; FIXME: This MUST submit an update to the backend!
   (let [stages     (get-in state [:sample :stages])
         method-id  (get-in state [:sample :new-stage :method :value])
@@ -63,5 +64,4 @@
                                   :method-id  method-id
                                   :annotation method-ann}))
           (assoc-in [:sample :new-stage]
-                    (get-in [:sample :new-stage] null-state))))))
-(register-handler :event/stage-added handler:stage-added)
+                    (get-in [:sample :new-stage] null-state)))))))
