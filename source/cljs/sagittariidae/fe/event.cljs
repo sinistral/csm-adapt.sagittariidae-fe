@@ -1,31 +1,64 @@
 
 (ns sagittariidae.fe.event
   (:require [clojure.string :refer [trim]]
-            [re-frame.core :refer [register-handler]]
             [sagittariidae.fe.backend :as b]
-            [sagittariidae.fe.state :refer [clear null-state]]))
+            [ajax.core :refer [GET]]
+            [re-frame.core :refer [dispatch register-handler]]
+            [sagittariidae.fe.state :refer [clear copy-state null-state]]))
+
+(def ^{:dynamic true} ajax-endpoint "http://localhost:5000/")
+
+(defn endpoint
+  [r]
+  (str ajax-endpoint r))
+
+(defn ajax-get
+  [resource handler]
+  (let [res-uri (endpoint resource)]
+    (.info js/console "GET" res-uri)
+    (GET res-uri
+         :response-format :json
+         :keywords?       :true
+         :handler         handler)))
 
 (register-handler
  :event/initialising
  (fn [state [_ res]]
-   (assoc (if (empty? state)
-            null-state
-            state)
-          :resumable res)))
+   (ajax-get "projects" #(dispatch [:event/projects-retrieved %]))
+   (ajax-get "methods" #(dispatch [:event/methods-retrieved %]))
+   (-> (if (empty? state)
+         null-state
+         state)
+       (assoc :resumable res))))
+
+(register-handler
+ :event/methods-retrieved
+ (fn [state [_ methods]]
+   (.info js/console "Received methods" (clj->js methods))
+   (assoc-in state [:cached :methods] methods)))
+
+(register-handler
+ :event/projects-retrieved
+ (fn [state [_ projects]]
+   (.info js/console "Received projects" (clj->js projects))
+   (assoc-in state [:cached :projects] projects)))
 
 (register-handler
  :event/project-selected
- (fn [state [_ id name]]
-  (assoc null-state :project {:id id :name name})))
+ (fn [state [_ project]]
+   (-> null-state
+       (copy-state state [[:cached]])
+       (assoc :project project))))
 
 ;; ---------------------------------------------------- sample ID search --- ;;
 
 (register-handler
  :event/sample-id-changed
  (fn [state [_ sample-id]]
-  (-> null-state
-      (assoc :project (:project state))
-      (assoc-in [:sample :id] sample-id))))
+   (-> null-state
+       (copy-state state [[:cached]
+                          [:project]])
+       (assoc-in [:sample :id] sample-id))))
 
 (register-handler
  :event/sample-id-search-requested
@@ -60,16 +93,15 @@
  (fn [state _]
   ;; FIXME: This MUST submit an update to the backend!
   (let [stages     (get-in state [:sample :stages])
-        method-id  (get-in state [:sample :new-stage :method :value])
-        method-ann (trim (or (get-in state [:sample :new-stage :annotation]) ""))]
-    (when (and method-id (not (empty? method-ann)))
+        method     (trim (or (get-in state [:sample :new-stage :method :label] "")))
+        annotation (trim (or (get-in state [:sample :new-stage :annotation]) ""))]
+    (when (and (not (empty? method)) (not (empty? annotation)))
       (-> state
           (assoc-in [:sample :stages]
                     (conj stages {:id         (+ 1 (:id (last stages)))
-                                  :method-id  method-id
-                                  :annotation method-ann}))
-          (assoc-in [:sample :new-stage]
-                    (get-in [:sample :new-stage] null-state)))))))
+                                  :method     method
+                                  :annotation annotation}))
+          (copy-state null-state [[:sample :new-stage]]))))))
 
 ;; ------------------------------------------- sample stage detail input --- ;;
 

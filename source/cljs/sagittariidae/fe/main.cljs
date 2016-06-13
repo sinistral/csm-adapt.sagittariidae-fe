@@ -91,9 +91,9 @@
      [:span.glyphicon.glyphicon-download]]]])
 
 (defn component:select
-  [v]
-  [select {:options   (b/stage-methods)
-           :value     v
+  [selection-opts initial-value]
+  [select {:options   selection-opts
+           :value     initial-value
            :on-change #(dispatch [:event/stage-method-selected %])}])
 
 ;; ------------------------------------------------ top level components --- ;;
@@ -167,13 +167,18 @@
 
 (defn component:sample-stage-input-form
   []
-  (let [new-stage (subscribe [:query/sample-stage-input])]
+  (let [methods  (subscribe [:query/methods])
+        options  (reaction (map #(-> %
+                                     (assoc :value (:id %))
+                                     (assoc :label (:name %1)))
+                                @methods))
+        new-stage (subscribe [:query/sample-stage-input])]
     (fn []
       (let [{:keys [method annotation]} @new-stage]
         [:div
          [row
           [column {:md 4}
-           [component:select (:value method)]]
+           [component:select @options (:value method)]]
           [column {:md 8}
            [form-control {:type        "text"
                           :placeholder "Annotation ..."
@@ -186,38 +191,39 @@
 
 (defn component:sample-stage-table
   []
-  (let [sample-stages (subscribe [:query/sample-stages])]
+  (let [test-methods  (subscribe [:query/methods])
+        method-map    (reaction ;; Convert the list of maps into a map of maps,
+                                ;; indexed by method name.
+                                (apply hash-map
+                                       (mapcat (fn [x] [(:name x) x]) @test-methods)))
+        sample-stages (subscribe [:query/sample-stages])]
     (fn []
-      (let [method-data-fn
-            (fn [x]
-              (:name (get (b/stage-methods) x)))
-            btn-data-fn
-            (fn [_ {:keys [id]}]
-              [(if (= (:active @sample-stages) id)
-                 :button.btn.btn-success
-                 :button.btn.btn-default)
-               {:type     "button"
-                :on-click #(dispatch [:event/stage-selected id])}
-               [:span.glyphicon.glyphicon-chevron-right]])
-            spec
-            {:id         {:label "#"}
-             :method-id  {:label "Method"          :data-fn method-data-fn}
-             :annotation {:label "Annotation"}
-             :xref       {:label "Cross reference"}
-             :btn        {:label ""                :data-fn btn-data-fn}}]
-        [component:table spec (:stages @sample-stages)]))))
+      (let [btn-data-fn (fn [_ {:keys [id]}]
+                          [(if (= (:active @sample-stages) id)
+                             :button.btn.btn-success
+                             :button.btn.btn-default)
+                           {:type     "button"
+                            :on-click #(dispatch [:event/stage-selected id])}
+                           [:span.glyphicon.glyphicon-chevron-right]])
+            column-spec {:id         {:label "#"}
+                         :method     {:label "Method" }
+                         :annotation {:label "Annotation"}
+                         :xref       {:label "Cross reference"}
+                         :btn        {:label "" :data-fn btn-data-fn}}]
+        [component:table column-spec (:stages @sample-stages)]))))
 
 (defn component:project-dropdown
   []
-  (let [project-id (subscribe [:query/project-id])]
+  (let [projects       (subscribe [:query/projects])
+        active-project (subscribe [:query/active-project])]
     (fn []
       [nav-dropdown
        {:id "nav-project-dropdown"
-        :title (if (nil? (:id @project-id))
+        :title (if (or (nil? @active-project) (empty? @active-project))
                  "Project"
-                 (str "Project: " (:name @project-id)))}
-       (for [[id name] (b/projects)]
-         (let [event [:event/project-selected id name]]
+                 (str "Project: " (:name @active-project)))}
+       (for [{:keys [id name] :as project} @projects]
+         (let [event [:event/project-selected (select-keys project [:id :name])]]
            ^{:key id} [menu-item {:on-click #(dispatch event)} name]))])))
 
 ;; --------------------------------------------------------- entry point --- ;;

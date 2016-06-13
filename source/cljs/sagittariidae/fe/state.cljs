@@ -5,8 +5,9 @@
             [reagent.ratom :refer-macros [reaction]]))
 
 (defonce null-state
-  {:project {:id nil
-             :name nil}
+  {:cached {:projects []
+            :methods []}
+   :project ""
    :sample {:id nil
             :stages []
             :active-stage {:id nil
@@ -26,11 +27,38 @@
   [state path]
   (assoc-in state path (get-in null-state path)))
 
+(defn copy-state
+  "Copy elements of the application state from `src` to `dst`; `paths` is a
+  collection of sequences, where each is a path that might be used with
+  `assoc-in` or `get-in`.  This function makes no attempt to optimise the
+  process by looking for longer paths that may be contained within shorter
+  ones."
+  [dst src paths]
+  (loop [paths paths
+         dst   dst]
+    (if (seq paths)
+      (let [path (first paths)]
+        (recur (rest paths)
+               (assoc-in dst path (get-in src path))))
+      dst)))
+
 (register-sub
- :query/project-id
+ :query/projects
  (fn [state [query-id]]
-  (assert (= query-id :query/project-id))
-  (reaction (select-keys (:project @state) [:id :name]))))
+   (assert (= query-id :query/projects))
+   (reaction (get-in @state [:cached :projects]))))
+
+(register-sub
+ :query/methods
+ (fn [state [query-id]]
+   (assert (= query-id :query/methods))
+   (reaction (get-in @state [:cached :methods]))))
+
+(register-sub
+ :query/active-project
+ (fn [state [query-id]]
+   (assert (= query-id :query/active-project))
+   (reaction (:project @state))))
 
 (register-sub
  :query/sample-id
