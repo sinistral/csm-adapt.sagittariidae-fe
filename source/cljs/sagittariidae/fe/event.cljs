@@ -1,16 +1,16 @@
 
 (ns sagittariidae.fe.event
-  (:require [clojure.string :refer [trim]]
+  (:require [clojure.string :as s]
             [sagittariidae.fe.backend :as b]
             [ajax.core :refer [GET]]
             [re-frame.core :refer [dispatch register-handler]]
             [sagittariidae.fe.state :refer [clear copy-state null-state]]))
 
-(def ^{:dynamic true} ajax-endpoint "http://localhost:5000/")
+(def ^{:dynamic true} ajax-endpoint "http://localhost:5000")
 
 (defn endpoint
-  [r]
-  (str ajax-endpoint r))
+  [rpath]
+  (s/join "/" (concat [ajax-endpoint] rpath)))
 
 (defn ajax-get
   [resource handler]
@@ -24,8 +24,8 @@
 (register-handler
  :event/initialising
  (fn [state [_ res]]
-   (ajax-get "projects" #(dispatch [:event/projects-retrieved %]))
-   (ajax-get "methods" #(dispatch [:event/methods-retrieved %]))
+   (ajax-get ["projects"] #(dispatch [:event/projects-retrieved %]))
+   (ajax-get ["methods"] #(dispatch [:event/methods-retrieved %]))
    (-> (if (empty? state)
          null-state
          state)
@@ -93,8 +93,8 @@
  (fn [state _]
   ;; FIXME: This MUST submit an update to the backend!
   (let [stages     (get-in state [:sample :stages])
-        method     (trim (or (get-in state [:sample :new-stage :method :label] "")))
-        annotation (trim (or (get-in state [:sample :new-stage :annotation]) ""))]
+        method     (s/trim (or (get-in state [:sample :new-stage :method :label] "")))
+        annotation (s/trim (or (get-in state [:sample :new-stage :annotation]) ""))]
     (when (and (not (empty? method)) (not (empty? annotation)))
       (-> state
           (assoc-in [:sample :stages]
