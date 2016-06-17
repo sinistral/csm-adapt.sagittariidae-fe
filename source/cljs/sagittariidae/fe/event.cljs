@@ -1,6 +1,7 @@
 
 (ns sagittariidae.fe.event
   (:require [clojure.string :as s]
+            [cljs.pprint :refer [cl-format]]
             [sagittariidae.fe.backend :as b]
             [ajax.core :refer [GET]]
             [re-frame.core :refer [dispatch register-handler]]
@@ -20,6 +21,10 @@
          :response-format :json
          :keywords?       :true
          :handler         handler)))
+
+(defn urify
+  [x]
+  (-> x (s/trim) (js/encodeURIComponent)))
 
 (register-handler
  :event/initialising
@@ -53,17 +58,53 @@
 ;; ---------------------------------------------------- sample ID search --- ;;
 
 (register-handler
- :event/sample-id-changed
- (fn [state [_ sample-id]]
+ :event/sample-name-changed
+ (fn [state [_ sample-name]]
    (-> null-state
        (copy-state state [[:cached]
                           [:project]])
-       (assoc-in [:sample :id] sample-id))))
+       (assoc-in [:sample :name] sample-name))))
 
 (register-handler
- :event/sample-id-search-requested
+ :event/sample-name-search-requested
  (fn [state _]
-  (assoc-in state [:sample :stages] (b/sample-stages nil (get-in state [:sample :id])))))
+   (letfn []
+     (ajax-get ["projects"
+                (urify (get-in state [:project :id]))
+                (str "samples?name=" (urify (get-in state [:sample :name])))]
+               #(dispatch [:event/sample-retrieved %]))
+     state)))
+
+(register-handler
+ :event/sample-retrieved
+ (fn [state [_ sample]]
+   (.info js/console "Retrieved sample details" (clj->js sample))
+   (let [expected-id (get-in state [:sample :name])
+         actual-id   (:name sample)]
+     (if (= expected-id actual-id)
+       (do
+         (ajax-get ["projects"
+                    (urify (get-in state [:project :id]))
+                    "samples"
+                    (urify (:id sample))
+                    "stages"]
+                   #(dispatch [:event/sample-stages-retrieved %]))
+           (assoc-in state [:sample :id] (:id sample)))
+       (do
+         (.warn js/console "Details for sample %s are not for expected sample %s" actual-id expected-id)
+         state)))))
+
+(register-handler
+ :event/sample-stages-retrieved
+ (fn [state [_ rsp]]
+   (.info js/console "Retrieved sample stages" (clj->js rsp))
+   (when-let [stages (:stages rsp)]
+     (let [expected-id (get-in state [:sample :id])
+           actual-id   (:sample (first stages))]
+       (if (= expected-id actual-id)
+         (assoc-in state [:sample :stages] stages)
+         (do (.warn js/console "Stages for sample %s are not for expected sample %s" actual-id expected-id)
+             state))))))
 
 ;; ----------------------------------- sample stage, drilldown and input --- ;;
 

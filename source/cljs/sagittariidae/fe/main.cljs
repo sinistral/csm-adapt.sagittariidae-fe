@@ -102,10 +102,10 @@
   []
   (let [sample-id (subscribe [:query/sample-id])]
     (fn []
-      (let [change #(dispatch [:event/sample-id-changed %])
-            click #(dispatch [:event/sample-id-search-requested])]
+      (let [change #(dispatch [:event/sample-name-changed %])
+            click #(dispatch [:event/sample-name-search-requested])]
         (component:text-input-action "Search for a sample ..."
-                                     @sample-id
+                                     (:name @sample-id)
                                      change
                                      click)))))
 
@@ -193,24 +193,28 @@
   []
   (let [test-methods  (subscribe [:query/methods])
         method-map    (reaction ;; Convert the list of maps into a map of maps,
-                                ;; indexed by method name.
+                                ;; indexed by resource name.
                                 (apply hash-map
-                                       (mapcat (fn [x] [(:name x) x]) @test-methods)))
+                                       (mapcat (fn [x] [(:id x) x]) @test-methods)))
         sample-stages (subscribe [:query/sample-stages])]
     (fn []
-      (let [btn-data-fn (fn [_ {:keys [id]}]
+      (let [mth-data-fn (fn [method _]
+                          (:name (get @method-map method)))
+            btn-data-fn (fn [_ {:keys [id]}]
                           [(if (= (:active @sample-stages) id)
                              :button.btn.btn-success
                              :button.btn.btn-default)
                            {:type     "button"
                             :on-click #(dispatch [:event/stage-selected id])}
                            [:span.glyphicon.glyphicon-chevron-right]])
-            column-spec {:id         {:label "#"}
-                         :method     {:label "Method" }
+            column-spec {:position   {:label "#"}
+                         :method     {:label "Method" :data-fn mth-data-fn}
                          :annotation {:label "Annotation"}
-                         :xref       {:label "Cross reference"}
-                         :btn        {:label "" :data-fn btn-data-fn}}]
-        [component:table column-spec (:stages @sample-stages)]))))
+                         :alt_id     {:label "Cross reference"}
+                         :btn        {:label ""       :data-fn btn-data-fn}}]
+        [component:table column-spec (map #(-> %1 (assoc :position %2))
+                                          (:stages @sample-stages)
+                                          (range))]))))
 
 (defn component:project-dropdown
   []
