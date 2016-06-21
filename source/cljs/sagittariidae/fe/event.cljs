@@ -3,7 +3,7 @@
   (:require [clojure.string :as s]
             [cljs.pprint :refer [cl-format]]
             [sagittariidae.fe.backend :as b]
-            [ajax.core :refer [GET]]
+            [ajax.core :refer [GET PUT]]
             [re-frame.core :refer [dispatch register-handler]]
             [sagittariidae.fe.state :refer [clear copy-state null-state]]))
 
@@ -13,24 +13,40 @@
   [rpath]
   (s/join "/" (concat [ajax-endpoint] rpath)))
 
-(defn ajax-get
-  [resource handler]
-  (let [res-uri (endpoint resource)]
-    (.info js/console "GET" res-uri)
-    (GET res-uri
-         :response-format :json
-         :keywords?       :true
-         :handler         handler)))
-
-(defn urify
-  [x]
+(defn urify [x]
   (-> x (s/trim) (js/encodeURIComponent)))
+
+(defn ajax-err
+  [state]
+  (fn [e]
+    (.error js/console "AJAX error: " (clj->js e))))
+
+(defn ajax-get
+  [resource params]
+  (let [res-uri (endpoint resource)]
+    (.info js/console "GET %s" res-uri)
+    (apply GET
+           (flatten (concat [res-uri]
+                            (seq (-> params
+                                     (assoc :response-format :json)
+                                     (assoc :keywords?       :true))))))))
+
+(defn ajax-put
+  [resource data params]
+  (let [res-uri (endpoint resource)]
+    (.info js/console (str "PUT " res-uri "; " data))
+    (apply PUT
+           (flatten (concat [res-uri]
+                            (seq (-> params
+                                     (assoc :format          :json)
+                                     (assoc :response-format :json)
+                                     (assoc :params          data))))))))
 
 (register-handler
  :event/initialising
  (fn [state [_ res]]
-   (ajax-get ["projects"] #(dispatch [:event/projects-retrieved %]))
-   (ajax-get ["methods"] #(dispatch [:event/methods-retrieved %]))
+   (ajax-get ["projects"] {:handler #(dispatch [:event/projects-retrieved %])})
+   (ajax-get ["methods"] {:handler #(dispatch [:event/methods-retrieved %])})
    (-> (if (empty? state)
          null-state
          state)
@@ -68,12 +84,11 @@
 (register-handler
  :event/sample-name-search-requested
  (fn [state _]
-   (letfn []
-     (ajax-get ["projects"
-                (urify (get-in state [:project :id]))
-                (str "samples?name=" (urify (get-in state [:sample :name])))]
-               #(dispatch [:event/sample-retrieved %]))
-     state)))
+   (ajax-get ["projects"
+              (urify (get-in state [:project :id]))
+              (str "samples?name=" (urify (get-in state [:sample :name])))]
+             {:handler #(dispatch [:event/sample-retrieved %])})
+   state))
 
 (register-handler
  :event/sample-retrieved
@@ -88,7 +103,7 @@
                     "samples"
                     (urify (:id sample))
                     "stages"]
-                   #(dispatch [:event/sample-stages-retrieved %]))
+                   {:handler #(dispatch [:event/sample-stages-retrieved %])})
            (assoc-in state [:sample :id] (:id sample)))
        (do
          (.warn js/console "Details for sample %s are not for expected sample %s" actual-id expected-id)
@@ -102,7 +117,9 @@
      (let [expected-id (get-in state [:sample :id])
            actual-id   (:sample (first stages))]
        (if (= expected-id actual-id)
-         (assoc-in state [:sample :stages] stages)
+         (-> state
+             (assoc-in [:sample :stages :list] stages)
+             (assoc-in [:sample :stages :token] (:token rsp)))
          (do (.warn js/console "Stages for sample %s are not for expected sample %s" actual-id expected-id)
              state))))))
 
@@ -131,18 +148,29 @@
 
 (register-handler
  :event/stage-added
- (fn [state _]
-  ;; FIXME: This MUST submit an update to the backend!
-  (let [stages     (get-in state [:sample :stages])
-        method     (s/trim (or (get-in state [:sample :new-stage :method :label] "")))
-        annotation (s/trim (or (get-in state [:sample :new-stage :annotation]) ""))]
-    (when (and (not (empty? method)) (not (empty? annotation)))
-      (-> state
-          (assoc-in [:sample :stages]
-                    (conj stages {:id         (+ 1 (:id (last stages)))
-                                  :method     method
-                                  :annotation annotation}))
-          (copy-state null-state [[:sample :new-stage]]))))))
+ (fn [state [_ i m a]]
+   (let [method     (s/trim (or m ""))
+         annotation (s/trim (or a ""))]
+     (when (and (not (empty? method)) (not (empty? annotation)))
+       (let [project-id (get-in state [:project :id])
+             sample-id  (get-in state [:sample :id])]
+         (.info js/console
+                "Adding stage for sample %s,%s: method=%s, annotation="
+                project-id sample-id method annotation)
+         (ajax-put ["projects" (urify project-id)
+                    "samples"  (urify sample-id)
+                    "stages"   i]
+                   {:method        method
+                    :annotation    annotation}
+                   {:handler       #(dispatch [:event/stage-persisted %])
+                    :error-handler (ajax-err state)}))))
+   state))
+
+(register-handler
+ :event/stage-persisted
+ (fn [state [_ new-stage]]
+   (dispatch [:event/sample-name-search-requested])
+   (copy-state state null-state [[:sample :new-stage]])))
 
 ;; ------------------------------------------- sample stage detail input --- ;;
 

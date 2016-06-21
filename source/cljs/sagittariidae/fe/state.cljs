@@ -10,7 +10,8 @@
    :project ""
    :sample {:id nil
             :name nil
-            :stages []
+            :stages {:list []
+                     :token -1}
             :active-stage {:id nil
                            :file-spec []
                            :upload {:file nil
@@ -71,8 +72,9 @@
  :query/sample-stages
  (fn [state [query-id]]
    (assert (= query-id :query/sample-stages))
-   (reaction {:stages (get-in @state [:sample :stages])
-              :active (get-in @state [:sample :active-stage :id])})))
+   (reaction {:stages     (get-in @state [:sample :stages :list])
+              :next-stage (get-in @state [:sample :stages :token])
+              :active     (get-in @state [:sample :active-stage :id])})))
 
 (register-sub
  :query/sample-stage-detail
@@ -83,5 +85,7 @@
 (register-sub
  :query/sample-stage-input
  (fn [state [query-id]]
-  (assert (= query-id :query/sample-stage-input))
-  (reaction (get-in @state [:sample :new-stage]))))
+   (assert (= query-id :query/sample-stage-input))
+   (reaction (-> @state
+                 (get-in [:sample :new-stage])
+                 (assoc :id (get-in @state [:sample :stages :token]))))))

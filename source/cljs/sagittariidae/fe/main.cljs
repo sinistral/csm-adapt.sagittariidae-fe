@@ -174,7 +174,7 @@
                                 @methods))
         new-stage (subscribe [:query/sample-stage-input])]
     (fn []
-      (let [{:keys [method annotation]} @new-stage]
+      (let [{:keys [id method annotation]} @new-stage]
         [:div
          [row
           [column {:md 4}
@@ -183,10 +183,14 @@
            [form-control {:type        "text"
                           :placeholder "Annotation ..."
                           :value       annotation
-                          :on-change   #(dispatch [:event/stage-annotation-changed (-> % .-target .-value)])}]]]
+                          :on-change   #(dispatch [:event/stage-annotation-changed
+                                                   (-> % .-target .-value)])}]]]
          [row {:style {:padding-top "10px"}}
           [column {:md 2}
-           [button {:on-click #(dispatch [:event/stage-added])}
+           [button {:on-click (fn [_] (dispatch [:event/stage-added
+                                                 id
+                                                 (:id method)
+                                                 annotation]))}
             [glyph-icon {:glyph "plus"}]]]]]))))
 
 (defn component:sample-stage-table
