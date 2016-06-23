@@ -39,6 +39,7 @@
                                   [cljs-ajax                   "0.5.5"]
                                   [cljsjs/react-bootstrap      "0.29.2-0"]
                                   [cljsjs/react-select         "1.0.0-beta13-0"]
+                                  [prismatic/schema            "1.1.2"]
                                   [re-frame                    "0.7.0"]
                                   [reagent                     "0.6.0-alpha"]]
                          :dev   '[[adzerk/boot-cljs            "1.7.228-1"]

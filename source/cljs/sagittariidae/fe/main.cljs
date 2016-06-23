@@ -223,11 +223,12 @@
 (defn component:project-dropdown
   []
   (let [projects       (subscribe [:query/projects])
-        active-project (subscribe [:query/active-project])]
+        active-project (subscribe [:query/active-project])
+        project-name   (reaction (:name @active-project))]
     (fn []
       [nav-dropdown
        {:id "nav-project-dropdown"
-        :title (if (or (nil? @active-project) (empty? @active-project))
+        :title (if (or (nil? @project-name) (empty? @project-name))
                  "Project"
                  (str "Project: " (:name @active-project)))}
        (for [{:keys [id name] :as project} @projects]

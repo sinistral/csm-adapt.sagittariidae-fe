@@ -5,7 +5,10 @@
             [sagittariidae.fe.backend :as b]
             [ajax.core :refer [GET PUT]]
             [re-frame.core :refer [dispatch register-handler]]
-            [sagittariidae.fe.state :refer [clear copy-state null-state]]))
+            [schema.core :refer [validate]]
+            [sagittariidae.fe.state :refer [State clear copy-state null-state]]))
+
+;; -------------------------------------------------------- server comms --- ;;
 
 (def ^{:dynamic true} ajax-endpoint "http://localhost:5000")
 
@@ -42,8 +45,18 @@
                                      (assoc :response-format :json)
                                      (assoc :params          data))))))))
 
+;; ---------------------------------------------------------- middleware --- ;;
+
+(defn validate-state
+  [handler]
+  (fn [state event-vectr]
+    (validate State (handler state event-vectr))))
+
+;; ------------------------------------------------ init and static data --- ;;
+
 (register-handler
  :event/initialising
+ [validate-state]
  (fn [state [_ res]]
    (ajax-get ["projects"] {:handler #(dispatch [:event/projects-retrieved %])})
    (ajax-get ["methods"] {:handler #(dispatch [:event/methods-retrieved %])})
@@ -54,18 +67,21 @@
 
 (register-handler
  :event/methods-retrieved
+ [validate-state]
  (fn [state [_ methods]]
    (.info js/console "Received methods" (clj->js methods))
    (assoc-in state [:cached :methods] methods)))
 
 (register-handler
  :event/projects-retrieved
+ [validate-state]
  (fn [state [_ projects]]
    (.info js/console "Received projects" (clj->js projects))
    (assoc-in state [:cached :projects] projects)))
 
 (register-handler
  :event/project-selected
+ [validate-state]
  (fn [state [_ project]]
    (-> null-state
        (copy-state state [[:cached]])
@@ -75,6 +91,7 @@
 
 (register-handler
  :event/sample-name-changed
+ [validate-state]
  (fn [state [_ sample-name]]
    (-> null-state
        (copy-state state [[:cached]
@@ -83,6 +100,7 @@
 
 (register-handler
  :event/sample-name-search-requested
+ [validate-state]
  (fn [state _]
    (ajax-get ["projects"
               (urify (get-in state [:project :id]))
@@ -92,6 +110,7 @@
 
 (register-handler
  :event/sample-retrieved
+ [validate-state]
  (fn [state [_ sample]]
    (.info js/console "Retrieved sample details" (clj->js sample))
    (let [expected-id (get-in state [:sample :name])
@@ -104,13 +123,14 @@
                     (urify (:id sample))
                     "stages"]
                    {:handler #(dispatch [:event/sample-stages-retrieved %])})
-           (assoc-in state [:sample :id] (:id sample)))
+         (assoc-in state [:sample :id] (:id sample)))
        (do
          (.warn js/console "Details for sample %s are not for expected sample %s" actual-id expected-id)
          state)))))
 
 (register-handler
  :event/sample-stages-retrieved
+ [validate-state]
  (fn [state [_ rsp]]
    (.info js/console "Retrieved sample stages" (clj->js rsp))
    (when-let [stages (:stages rsp)]
@@ -127,27 +147,31 @@
 
 (register-handler
  :event/stage-selected
+ [validate-state]
  (fn [state [_ stage-id]]
-  (let [project-id (get-in state [:project :id])
-        sample-id  (get-in state [:sample :id])]
-    (-> state
-        (assoc-in [:sample :active-stage :id]
-                  stage-id)
-        (assoc-in [:sample :active-stage :file-spec]
-                  (b/stage-details project-id sample-id stage-id))))))
+   (let [project-id (get-in state [:project :id])
+         sample-id  (get-in state [:sample :id])]
+     (-> state
+         (assoc-in [:sample :active-stage :id]
+                   stage-id)
+         (assoc-in [:sample :active-stage :file-spec]
+                   (b/stage-details project-id sample-id stage-id))))))
 
 (register-handler
  :event/stage-method-selected
+ [validate-state]
  (fn [state [_ m]]
-  (assoc-in state [:sample :new-stage :method] (js->clj m :keywordize-keys true))))
+   (assoc-in state [:sample :new-stage :method] (js->clj m :keywordize-keys true))))
 
 (register-handler
  :event/stage-annotation-changed
+ [validate-state]
  (fn [state [_ annotation]]
-  (assoc-in state [:sample :new-stage :annotation] annotation)))
+   (assoc-in state [:sample :new-stage :annotation] annotation)))
 
 (register-handler
  :event/stage-added
+ [validate-state]
  (fn [state [_ i m a]]
    (let [method     (s/trim (or m ""))
          annotation (s/trim (or a ""))]
@@ -168,6 +192,7 @@
 
 (register-handler
  :event/stage-persisted
+ [validate-state]
  (fn [state [_ new-stage]]
    (dispatch [:event/sample-name-search-requested])
    (copy-state state null-state [[:sample :new-stage]])))

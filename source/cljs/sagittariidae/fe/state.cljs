@@ -2,22 +2,56 @@
 (ns sagittariidae.fe.state
   (:require [re-frame.core :refer [register-sub]]
             [reagent.core :as reagent]
-            [reagent.ratom :refer-macros [reaction]]))
+            [reagent.ratom :refer-macros [reaction]]
+            [schema.core :refer [Int Keyword Num Str
+                                 enum maybe]]))
+
+(def State
+  "The Prismatic Schema for the Sagittariidae application state."
+  (let [method {:id Str
+                :name Str
+                :description Str}]
+    {:project {:id Str
+               :name Str}
+     :cached {:projects [{:id Str
+                          :name Str
+                          :sample-mask Str}]
+              :methods [method]}
+     :sample {:id Str
+              :name Str
+              :stages {:list  [{:id Str
+                                :method Str
+                                :annotation Str
+                                :alt-id (maybe Str)
+                                :sample Str}]
+                       :token (maybe Str)}
+              :active-stage {:id (maybe Str)
+                             :file-spec [{:id Int
+                                          :file Str
+                                          :status (enum :unknown :processing :ready)}]
+                             :upload {:file Str
+                                      :progress Num
+                                      :state Keyword}}
+              :new-stage {:method (maybe (conj method {:label Str
+                                                       :value Str}))
+                          :annotation Str}}
+     :resumable (maybe js/Resumable)}))
 
 (defonce null-state
   {:cached {:projects []
             :methods []}
-   :project ""
-   :sample {:id nil
-            :name nil
+   :project {:id ""
+             :name ""}
+   :sample {:id ""
+            :name ""
             :stages {:list []
-                     :token -1}
+                     :token nil}
             :active-stage {:id nil
                            :file-spec []
-                           :upload {:file nil
+                           :upload {:file ""
                                     :progress 0.0
                                     :state :default}}
-            :new-stage {:method {}
+            :new-stage {:method nil
                         :annotation ""}}
    :resumable nil})
 
