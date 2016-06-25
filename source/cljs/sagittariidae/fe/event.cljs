@@ -3,7 +3,7 @@
   (:require [clojure.string :as s]
             [cljs.pprint :refer [cl-format]]
             [sagittariidae.fe.backend :as b]
-            [ajax.core :refer [GET PUT]]
+            [ajax.core :refer [GET POST PUT]]
             [re-frame.core :refer [dispatch register-handler]]
             [schema.core :refer [validate]]
             [sagittariidae.fe.state :refer [State clear copy-state null-state]]))
@@ -19,10 +19,17 @@
 (defn urify [x]
   (-> x (s/trim) (js/encodeURIComponent)))
 
-(defn ajax-err
-  [state]
-  (fn [e]
-    (.error js/console "AJAX error: " (clj->js e))))
+(def ajax-default-params
+  {:response-format :json
+   :keywords?       :true
+   :error-handler   (fn [e]
+                      (.error js/console "AJAX error: " (clj->js e)))})
+
+(def ajax-default-mutating-params
+  (conj ajax-default-params
+        {:format          :json
+         :response-format :json
+         :keywords?       :true}))
 
 (defn ajax-get
   [resource params]
@@ -30,20 +37,25 @@
     (.info js/console "GET %s" res-uri)
     (apply GET
            (flatten (concat [res-uri]
-                            (seq (-> params
-                                     (assoc :response-format :json)
-                                     (assoc :keywords?       :true))))))))
+                            (seq (-> ajax-default-params (conj params))))))))
+
+(defn- ajax-mutate
+  [action resource data params]
+  (let [res-uri (endpoint resource)]
+    (.info js/console (str action " " res-uri ";" data))
+    (apply action
+           (flatten (concat [res-uri]
+                            (seq (-> ajax-default-mutating-params
+                                     (conj params)
+                                     (assoc :params data))))))))
 
 (defn ajax-put
   [resource data params]
-  (let [res-uri (endpoint resource)]
-    (.info js/console (str "PUT " res-uri "; " data))
-    (apply PUT
-           (flatten (concat [res-uri]
-                            (seq (-> params
-                                     (assoc :format          :json)
-                                     (assoc :response-format :json)
-                                     (assoc :params          data))))))))
+  (ajax-mutate PUT resource data params))
+
+(defn ajax-post
+  [resource data params]
+  (ajax-mutate POST resource data params))
 
 ;; ---------------------------------------------------------- middleware --- ;;
 
@@ -84,7 +96,8 @@
  [validate-state]
  (fn [state [_ project]]
    (-> null-state
-       (copy-state state [[:cached]])
+       (copy-state state [[:cached]
+                          [:resumable]])
        (assoc :project project))))
 
 ;; ---------------------------------------------------- sample ID search --- ;;
@@ -95,6 +108,7 @@
  (fn [state [_ sample-name]]
    (-> null-state
        (copy-state state [[:cached]
+                          [:resumable]
                           [:project]])
        (assoc-in [:sample :name] sample-name))))
 
@@ -179,15 +193,14 @@
        (let [project-id (get-in state [:project :id])
              sample-id  (get-in state [:sample :id])]
          (.info js/console
-                "Adding stage for sample %s,%s: method=%s, annotation="
+                "Adding stage for sample %s,%s: method=%s, annotation=%s"
                 project-id sample-id method annotation)
          (ajax-put ["projects" (urify project-id)
                     "samples"  (urify sample-id)
                     "stages"   i]
-                   {:method        method
-                    :annotation    annotation}
-                   {:handler       #(dispatch [:event/stage-persisted %])
-                    :error-handler (ajax-err state)}))))
+                   {:method     method
+                    :annotation annotation}
+                   {:handler    #(dispatch [:event/stage-persisted %])}))))
    state))
 
 (register-handler
@@ -202,31 +215,54 @@
 (def upload-path [:sample :active-stage :upload])
 
 (register-handler
+ :event/upload-file-parts-complete
+ (fn [state _]
+   (.debug js/console "state @ part upload completion is:" (clj->js state))
+   (let [f (get-in state (conj upload-path :file))]
+     (ajax-post ["complete-multipart-upload"]
+                {:upload-id (.-uniqueIdentifier f)
+                 :file-name (.-fileName f)
+                 :project   (:project state)
+                 :sample    (get-in state [:sample :id])}
+                {:handler   #(dispatch [:event/upload-file-complete])
+                 :error-handler #(dispatch [:event/upload-file-error "File upload error" f])}))
+   state))
+
+(register-handler
  :event/upload-file-complete
  (fn [state _]
-   (.debug js/console "File upload complete.")
+   (.debug js/console "file upload complete: " (get-in state (conj upload-path :file)))
    (.removeFile (:resumable state) (get-in state (conj upload-path :file)))
    (let [new-state (assoc-in state (conj upload-path :state) :success)]
-     (.debug js/console "state is now:" (clj->js new-state))
+     (.debug js/console "state @ file upload completion is:" (clj->js new-state))
+     (assoc-in new-state (conj upload-path :progress) 1)
      new-state)))
 
 (register-handler
  :event/upload-file-error
- (fn [state msg file]
-   (.debug js/console "File upload error!")
-   (assoc-in state (conj upload-path :state) :error)))
+ (fn [state [_ msg file]]
+   (.debug js/console "File upload error!: " msg)
+   (.cancel (:resumable state))
+   (let [new-state (-> state
+                       (assoc-in (conj upload-path :progress) 1)
+                       (assoc-in (conj upload-path :state) :error))]
+     (.debug js/console "state @ file upload error is:" (clj->js new-state))
+     new-state)))
 
 (register-handler
  :event/upload-file-added
  (.debug js/console "File added for upload.")
  (fn [state [_ f]]
-   (.removeFile (:resumable state) (get-in state (conj upload-path :file)))
-   (-> state
-       (clear    upload-path)
-       (assoc-in (conj upload-path :file) f))))
+   (let [new-state (-> state
+                       (clear    upload-path)
+                       (assoc-in (conj upload-path :file) f))]
+     (.debug js/console "state is now:" (clj->js new-state))
+     new-state)))
 
 (register-handler
  :event/upload-file-progress-updated
- (.debug js/console "File upload progress update.")
  (fn [state [_ n]]
-   (assoc-in state (conj upload-path :progress) n)))
+   ;;
+   (if-not (= (get-in state (conj upload-path :state)) :error)
+      (assoc-in state (conj upload-path :progress) n)
+     state)))

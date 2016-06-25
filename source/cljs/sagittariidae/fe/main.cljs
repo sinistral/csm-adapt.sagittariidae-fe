@@ -137,9 +137,12 @@
                                ""))
         prog-n     (reaction (get-in @detail [:upload :progress]))
         prog-state (reaction (get-in @detail [:upload :state]))
-        prog-style (reaction (if (and (= @prog-state :success) (= @prog-n 1))
-                               :success
-                               :default))]
+        prog-style (reaction (cond (and (= @prog-state :success) (= @prog-n 1))
+                                   :success
+                                   (= @prog-state :error)
+                                   :danger
+                                   :else
+                                   :default))]
     (fn []
       [:div
        [row
@@ -249,7 +252,41 @@
   ;; Initialise the application state so that components have sensible defaults
   ;; for their first render.  Synchronous "dispatch" ensures that the
   ;; initialisation is complete before any of the components are created.
-  (let [res (js/Resumable. {:target "/upload" :testChunks true})]
+  (let [res (js/Resumable.
+             #js {:target                        "http://localhost:5000/upload-part"
+
+                  ;;; The current version of Resumable doesn't support these
+                  ;;; options but they are available in mainline.  It would be
+                  ;;; nice to put them in place when they do become available,
+                  ;;; because it would clean up the API and make it less
+                  ;;; Resumable-specific.
+                  ;;
+                  ;; :currentChunkSizeParameterName "part-size"
+                  ;; :chunkNumberParameterName      "part-number"
+                  ;; :totalChunksParameterName      "total-parts"
+                  ;; :totalSizeParameterName        "file-size"
+                  ;; :identifierParameterName       "upload-id"
+                  ;; :fileNameParameterName         "file-name"
+                  ;; :typeParameterName             "file-type"
+
+                  :testChunks                    false
+                  :maxFiles                      1
+                  :maxChunkRetries               9
+                  :chunkRetryInterval            900
+
+                  ;; Large uploads with many simultaneous connections tend to
+                  ;; result in 'network connection was lost' errors.  Various
+                  ;; articles point the finger at Safari/MacOS (I've seen the
+                  ;; same error in Chrome on MacOS) not handling Keep-Alive
+                  ;; connections correctly.
+                  ;;
+                  ;; What I think is happening here though is that the server
+                  ;; follow a strict request-response protocol.  Thus the
+                  ;; upload has to finish within the Keep-Alive timeout, since
+                  ;; the server isn't streaming Keep-Alive data back to us
+                  ;; while the upload is in progress.
+                  :simultaneousUploads 1
+                  :chunkSize           (* 128 1024)})]
     (dispatch-sync [:event/initialising res])
     (let [add-id "sample-stage-detail-upload-add-file-button"]
       (add-component [component:sample-stage-detail-upload-form
@@ -262,16 +299,25 @@
         ;; Callback configuration
         (.on "complete"
              (fn []
-               (dispatch [:event/upload-file-complete])))
+               (dispatch [:event/upload-file-parts-complete])))
         (.on "error"
              (fn [m f]
-               (dispatch [:event/upload-file-error m])))
+               (dispatch [:event/upload-file-error m f])))
+        (.on "fileError"
+             (fn [f m]
+               (dispatch [:event/upload-file-error m f])))
         (.on "fileAdded"
              (fn [f]
                (dispatch [:event/upload-file-added f])))
+        (.on "fileRetry"
+             (fn [f]
+               (.warn js/console "Resumable upload retry: " f)))
         (.on "progress"
              (fn []
-               (dispatch [:event/upload-file-progress-updated (.progress res)]))))))
+               (dispatch [:event/upload-file-progress-updated (.progress res)])))
+        (comment (.on "catchAll"
+                      (fn [e & args]
+                        (.debug js/console "resumableEvent: %s, %s" e args)))))))
   (add-component [component:project-dropdown]
                  "nav-project-dropdown")
   (add-component [component:sample-search]

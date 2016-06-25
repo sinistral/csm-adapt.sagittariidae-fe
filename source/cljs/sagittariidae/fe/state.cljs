@@ -29,13 +29,19 @@
                              :file-spec [{:id Int
                                           :file Str
                                           :status (enum :unknown :processing :ready)}]
-                             :upload {:file Str
+                             :upload {:file (maybe js/Object) ;; FIXME [1]
                                       :progress Num
                                       :state Keyword}}
               :new-stage {:method (maybe (conj method {:label Str
                                                        :value Str}))
                           :annotation Str}}
-     :resumable (maybe js/Resumable)}))
+     :resumable js/Resumable}))
+
+;; [1] This should be an instance of ResumableFile.  It's constructor function
+;;     is private to ResumableFile and I'm not certain how to get a handle to
+;;     it without resorting to weird reflection contortions.  Fow now I'm just
+;;     resorting to base type for the schema until I can figure out a better
+;;     way.
 
 (defonce null-state
   {:cached {:projects []
@@ -48,7 +54,7 @@
                      :token nil}
             :active-stage {:id nil
                            :file-spec []
-                           :upload {:file ""
+                           :upload {:file nil
                                     :progress 0.0
                                     :state :default}}
             :new-stage {:method nil
