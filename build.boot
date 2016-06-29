@@ -37,22 +37,30 @@
           (dependencies {:build '[[org.clojure/clojure         "1.7.0"]
                                   [org.clojure/clojurescript   "1.7.228"]
                                   [cljs-ajax                   "0.5.5"]
-                                  [cljsjs/react-bootstrap      "0.29.2-0"]
-                                  [cljsjs/react-select         "1.0.0-beta13-0"]
                                   [prismatic/schema            "1.1.2"]
                                   [re-frame                    "0.7.0"]
-                                  [reagent                     "0.6.0-alpha"]]
+                                  [reagent                     "0.6.0-alpha"]
+
+                                  ;; CLJSJS-packaged JavaScript libraries.
+                                  ;; These must be require'd by at least one
+                                  ;; namespace for the CLJS build to include
+                                  ;; them as build artefacts.
+                                  [cljsjs/firebase             "3.0.5-rc2-0"]
+                                  [cljsjs/react-bootstrap      "0.29.2-0"]
+                                  [cljsjs/react-select         "1.0.0-beta13-0"]]
                          :dev   '[[adzerk/boot-cljs            "1.7.228-1"]
                                   [adzerk/boot-cljs-repl       "0.3.0"]
                                   [adzerk/boot-reload          "0.4.8"]
                                   [degree9/boot-bower          "0.3.0"]
-                                  [deraen/boot-less            "0.5.0"] ;; required by cljsjs/react-bootstrap
+                                  [deraen/boot-less            "0.5.0"]  ;; [1]
                                   [org.clojure/tools.nrepl     "0.2.12"]
                                   [org.slf4j/slf4j-nop         "1.7.13"]
                                   [pandeiro/boot-http          "0.7.3"]
                                   [crisptrutski/boot-cljs-test "0.2.2-SNAPSHOT"]
                                   [com.cemerick/piggieback     "0.2.1"]
                                   [weasel                      "0.7.0"]]}))
+
+;; [1] Required by cljsjs/react-bootstrap
 
 (require
  '[clojure.java.io             :as    io]

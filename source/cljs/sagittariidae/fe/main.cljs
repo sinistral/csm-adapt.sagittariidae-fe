@@ -1,16 +1,17 @@
 
 (ns sagittariidae.fe.main
-  (:require [re-frame.core :refer [dispatch dispatch-sync subscribe]]
+  (:require [cljsjs.firebase]
+            [cljsjs.react-bootstrap]
+            [cljsjs.react-select]
+
+            [clojure.string :as str]
+            [re-frame.core :refer [dispatch dispatch-sync subscribe]]
             [reagent.core :refer [adapt-react-class render]]
             [reagent.ratom :refer-macros [reaction]]
             [sagittariidae.fe.backend :as b]
-            [sagittariidae.fe.reagent-utils :as u]
-            ;; The following namespaces aren't explictly used, but must be
-            ;; required to ensure that depdendent functionality (such as event
-            ;; handlers) is made available.
+
             [sagittariidae.fe.event]
-            [cljsjs.react-bootstrap]
-            [cljsjs.react-select]))
+            [sagittariidae.fe.reagent-utils :as u]))
 
 ;; -------------------------------------------------- adapted components --- ;;
 
@@ -238,6 +239,24 @@
          (let [event [:event/project-selected (select-keys project [:id :name])]]
            ^{:key id} [menu-item {:on-click #(dispatch event)} name]))])))
 
+(defn component:user
+  []
+  (let [user (subscribe [:query/user])]
+    (fn []
+      (if (nil? @user)
+        [nav-dropdown
+         {:id "nav-user-dropdown"
+          :title "User"}
+         ^{:key "sign-in"} [menu-item
+                            {:on-click #(dispatch [:event/user-signin-requested])}
+                            "Sign in"]]
+        [nav-dropdown
+         {:id "nav-user-dropdown"
+          :title (or (:display-name @user) (str (:user-id @user)))}
+         ^{:key "sign-out"} [menu-item
+                             {:on-click #(dispatch [:event/user-signout-requested])}
+                             "Sign out"]]))))
+
 ;; --------------------------------------------------------- entry point --- ;;
 
 (defn- by-id
@@ -248,46 +267,63 @@
   [c el]
   (render c (by-id el)))
 
-(defn main []
+(defn- make-resumable-js
+  []
+  (js/Resumable. #js {:target "http://localhost:5000/upload-part"
+
+                      ;; The current version of Resumable doesn't support these
+                      ;; options but they are available in mainline.  It would
+                      ;; be nice to put them in place when they do become
+                      ;; available, because it would clean up the API and make
+                      ;; it less Resumable-specific.
+                      ;;
+                      ;; :currentChunkSizeParameterName "part-size"
+                      ;; :chunkNumberParameterName      "part-number"
+                      ;; :totalChunksParameterName      "total-parts"
+                      ;; :totalSizeParameterName        "file-size"
+                      ;; :identifierParameterName       "upload-id"
+                      ;; :fileNameParameterName         "file-name"
+                      ;; :typeParameterName             "file-type"
+
+                      :testChunks                    false
+                      :maxFiles                      1
+                      :maxChunkRetries               9
+                      :chunkRetryInterval            900
+
+                      ;; Large uploads with many simultaneous connections tend
+                      ;; to result in 'network connection was lost' errors.
+                      ;; Various articles point the finger at Safari/MacOS
+                      ;; (I've seen the same error in Chrome on MacOS) not
+                      ;; handling Keep-Alive connections correctly.
+                      ;;
+                      ;; What I think is happening here though is that the
+                      ;; server follow a strict request-response protocol.
+                      ;; Thus the upload has to finish within the Keep-Alive
+                      ;; timeout, since the server isn't streaming Keep-Alive
+                      ;; data back to us while the upload is in progress.
+                      :simultaneousUploads 1
+                      :chunkSize           (* 128 1024)}))
+
+(defn- make-firebase-app
+  []
+  (let [app-name "Sagittariidae"
+        cached (first (filter #(= (.-name %) app-name) (.-apps js/firebase)))]
+    (if cached
+      [cached
+       false]    ;; No initialisation required.
+      [(-> js/firebase
+           (.initializeApp #js {:apiKey     "AIzaSyCM1tgBP2c6AZwvzkxw8xzUuMPBFebjXjA"
+                                :authDomain "sagittariidae-4e8fd.firebaseapp.com"}
+                           app-name))
+       true]))) ;; Initialisation required.
+
+(defn- initialise-components
+  [state]
+  (add-component [component:user] "user")
   ;; Initialise the application state so that components have sensible defaults
   ;; for their first render.  Synchronous "dispatch" ensures that the
   ;; initialisation is complete before any of the components are created.
-  (let [res (js/Resumable.
-             #js {:target                        "http://localhost:5000/upload-part"
-
-                  ;;; The current version of Resumable doesn't support these
-                  ;;; options but they are available in mainline.  It would be
-                  ;;; nice to put them in place when they do become available,
-                  ;;; because it would clean up the API and make it less
-                  ;;; Resumable-specific.
-                  ;;
-                  ;; :currentChunkSizeParameterName "part-size"
-                  ;; :chunkNumberParameterName      "part-number"
-                  ;; :totalChunksParameterName      "total-parts"
-                  ;; :totalSizeParameterName        "file-size"
-                  ;; :identifierParameterName       "upload-id"
-                  ;; :fileNameParameterName         "file-name"
-                  ;; :typeParameterName             "file-type"
-
-                  :testChunks                    false
-                  :maxFiles                      1
-                  :maxChunkRetries               9
-                  :chunkRetryInterval            900
-
-                  ;; Large uploads with many simultaneous connections tend to
-                  ;; result in 'network connection was lost' errors.  Various
-                  ;; articles point the finger at Safari/MacOS (I've seen the
-                  ;; same error in Chrome on MacOS) not handling Keep-Alive
-                  ;; connections correctly.
-                  ;;
-                  ;; What I think is happening here though is that the server
-                  ;; follow a strict request-response protocol.  Thus the
-                  ;; upload has to finish within the Keep-Alive timeout, since
-                  ;; the server isn't streaming Keep-Alive data back to us
-                  ;; while the upload is in progress.
-                  :simultaneousUploads 1
-                  :chunkSize           (* 128 1024)})]
-    (dispatch-sync [:event/initialising res])
+  (let [res (get-in state [:mutable :resumable])]
     (let [add-id "sample-stage-detail-upload-add-file-button"]
       (add-component [component:sample-stage-detail-upload-form
                       [component:sample-stage-detail-upload-add-file-button add-id]
@@ -328,3 +364,24 @@
                  "sample-stage-detail-table")
   (add-component [component:sample-stage-input-form]
                  "sample-stage-input-form"))
+
+(defn main
+  []
+  (let [resumable (make-resumable-js)
+        [firebase init-firebase?] (make-firebase-app)]
+    (dispatch-sync [:event/initialising
+                    {:mutable {:resumable resumable
+                               :firebase-app firebase}}])
+    ;; Firebase nitialisation is deferred because it triggers event that update
+    ;; the app state, so it can't be done until the application state itself
+    ;; has been initialised.
+    ;;
+    ;; We could pre-initialise the app state with default that don't include
+    ;; elements like Firebase that trigger state changes, but that means that
+    ;; resorting to the less strict `maybe` checks.
+    (if init-firebase?
+      (let [evt #(dispatch [:event/user-authentication-changed %])]
+        (-> firebase
+            (.auth)
+            (.onAuthStateChanged evt)))))
+  (initialise-components @re-frame.db/app-db))

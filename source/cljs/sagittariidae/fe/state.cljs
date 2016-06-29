@@ -11,7 +11,11 @@
   (let [method {:id Str
                 :name Str
                 :description Str}]
-    {:project {:id Str
+    {:user (maybe {:user-id Str
+                   :display-name Str
+                   :email Str
+                   :provider-id Str})
+     :project {:id Str
                :name Str}
      :cached {:projects [{:id Str
                           :name Str
@@ -29,22 +33,23 @@
                              :file-spec [{:id Int
                                           :file Str
                                           :status (enum :unknown :processing :ready)}]
-                             :upload {:file (maybe js/Object) ;; FIXME [1]
+                             :upload {:file (maybe js/Object) ;; ResumableFile [1]
                                       :progress Num
                                       :state Keyword}}
               :new-stage {:method (maybe (conj method {:label Str
                                                        :value Str}))
                           :annotation Str}}
-     :resumable js/Resumable}))
+     :mutable {:resumable js/Resumable
+               :firebase-app js/Object}})) ;; firebase.app.App [1]
 
-;; [1] This should be an instance of ResumableFile.  It's constructor function
-;;     is private to ResumableFile and I'm not certain how to get a handle to
-;;     it without resorting to weird reflection contortions.  Fow now I'm just
-;;     resorting to base type for the schema until I can figure out a better
-;;     way.
+;; [1] These should all be specific types of JavaScript objects.  Schema
+;;     requires JS prototype functions to do type matching, and whatever these
+;;     are don't fit the bill.  I need to understand the JS prototyping model
+;;     better and try to figure this out.
 
-(defonce null-state
-  {:cached {:projects []
+(def null-state
+  {:user   nil
+   :cached {:projects []
             :methods []}
    :project {:id ""
              :name ""}
@@ -59,7 +64,8 @@
                                     :state :default}}
             :new-stage {:method nil
                         :annotation ""}}
-   :resumable nil})
+   :mutable {:resumable nil
+             :firebase-app nil}})
 
 (def state
   (reagent/atom null-state))
@@ -83,6 +89,14 @@
         (recur (rest paths)
                (assoc-in dst path (get-in src path))))
       dst)))
+
+;; ------------------------------------------------------- subscriptions --- ;;
+
+(register-sub
+ :query/user
+ (fn [state [query-id]]
+   (assert (= query-id :query/user))
+   (reaction (:user @state))))
 
 (register-sub
  :query/projects
@@ -129,3 +143,19 @@
    (reaction (-> @state
                  (get-in [:sample :new-stage])
                  (assoc :id (get-in @state [:sample :stages :token]))))))
+
+;; ----------------------------------------------------------- accessors --- ;;
+
+;; For the sake of convenience we do store mutable (JavaScript) objects in the
+;; application state, even though this isn't really best practice.  Such data
+;; are stored under the `:mutable` tree to flag to clients that they are
+;; unsafe.  To reinforce this distinction, we do not provide subscriptions to
+;; these data; this wouldn't make sense anyway, since mutable data can change
+;; without the (r)atom's knowledge.  Rather, we provide standard fns as
+;; 'accessors', or named views into the data.
+
+(defn authenticator
+  ([]
+   (authenticator @re-frame.db/app-db))
+  ([state]
+   (.auth (get-in state [:mutable :firebase-app]))))
