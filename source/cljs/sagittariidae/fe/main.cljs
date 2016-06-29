@@ -1,16 +1,16 @@
 
 (ns sagittariidae.fe.main
-  (:require [re-frame.core :refer [dispatch dispatch-sync subscribe]]
+  (:require [cljsjs.react-bootstrap]
+            [cljsjs.react-select]
+
+            [clojure.string :as str]
+            [re-frame.core :refer [dispatch dispatch-sync subscribe]]
             [reagent.core :refer [adapt-react-class render]]
             [reagent.ratom :refer-macros [reaction]]
             [sagittariidae.fe.backend :as b]
-            [sagittariidae.fe.reagent-utils :as u]
-            ;; The following namespaces aren't explictly used, but must be
-            ;; required to ensure that depdendent functionality (such as event
-            ;; handlers) is made available.
+
             [sagittariidae.fe.event]
-            [cljsjs.react-bootstrap]
-            [cljsjs.react-select]))
+            [sagittariidae.fe.reagent-utils :as u]))
 
 ;; -------------------------------------------------- adapted components --- ;;
 
@@ -248,46 +248,49 @@
   [c el]
   (render c (by-id el)))
 
-(defn main []
-  ;; Initialise the application state so that components have sensible defaults
+(defn- make-resumable-js
+  []
+  (js/Resumable. #js {:target "http://localhost:5000/upload-part"
+
+                      ;; The current version of Resumable doesn't support these
+                      ;; options but they are available in mainline.  It would
+                      ;; be nice to put them in place when they do become
+                      ;; available, because it would clean up the API and make
+                      ;; it less Resumable-specific.
+                      ;;
+                      ;; :currentChunkSizeParameterName "part-size"
+                      ;; :chunkNumberParameterName      "part-number"
+                      ;; :totalChunksParameterName      "total-parts"
+                      ;; :totalSizeParameterName        "file-size"
+                      ;; :identifierParameterName       "upload-id"
+                      ;; :fileNameParameterName         "file-name"
+                      ;; :typeParameterName             "file-type"
+
+                      :testChunks                    false
+                      :maxFiles                      1
+                      :maxChunkRetries               9
+                      :chunkRetryInterval            900
+
+                      ;; Large uploads with many simultaneous connections tend
+                      ;; to result in 'network connection was lost' errors.
+                      ;; Various articles point the finger at Safari/MacOS
+                      ;; (I've seen the same error in Chrome on MacOS) not
+                      ;; handling Keep-Alive connections correctly.
+                      ;;
+                      ;; What I think is happening here though is that the
+                      ;; server follow a strict request-response protocol.
+                      ;; Thus the upload has to finish within the Keep-Alive
+                      ;; timeout, since the server isn't streaming Keep-Alive
+                      ;; data back to us while the upload is in progress.
+                      :simultaneousUploads 1
+                      :chunkSize           (* 128 1024)}))
+
+(defn- initialize-components
+  [state]
+  ;; Initialize the application state so that components have sensible defaults
   ;; for their first render.  Synchronous "dispatch" ensures that the
-  ;; initialisation is complete before any of the components are created.
-  (let [res (js/Resumable.
-             #js {:target                        "http://localhost:5000/upload-part"
-
-                  ;;; The current version of Resumable doesn't support these
-                  ;;; options but they are available in mainline.  It would be
-                  ;;; nice to put them in place when they do become available,
-                  ;;; because it would clean up the API and make it less
-                  ;;; Resumable-specific.
-                  ;;
-                  ;; :currentChunkSizeParameterName "part-size"
-                  ;; :chunkNumberParameterName      "part-number"
-                  ;; :totalChunksParameterName      "total-parts"
-                  ;; :totalSizeParameterName        "file-size"
-                  ;; :identifierParameterName       "upload-id"
-                  ;; :fileNameParameterName         "file-name"
-                  ;; :typeParameterName             "file-type"
-
-                  :testChunks                    false
-                  :maxFiles                      1
-                  :maxChunkRetries               9
-                  :chunkRetryInterval            900
-
-                  ;; Large uploads with many simultaneous connections tend to
-                  ;; result in 'network connection was lost' errors.  Various
-                  ;; articles point the finger at Safari/MacOS (I've seen the
-                  ;; same error in Chrome on MacOS) not handling Keep-Alive
-                  ;; connections correctly.
-                  ;;
-                  ;; What I think is happening here though is that the server
-                  ;; follow a strict request-response protocol.  Thus the
-                  ;; upload has to finish within the Keep-Alive timeout, since
-                  ;; the server isn't streaming Keep-Alive data back to us
-                  ;; while the upload is in progress.
-                  :simultaneousUploads 1
-                  :chunkSize           (* 128 1024)})]
-    (dispatch-sync [:event/initialising res])
+  ;; initialization is complete before any of the components are created.
+  (let [res (get-in state [:mutable :resumable])]
     (let [add-id "sample-stage-detail-upload-add-file-button"]
       (add-component [component:sample-stage-detail-upload-form
                       [component:sample-stage-detail-upload-add-file-button add-id]
@@ -328,3 +331,9 @@
                  "sample-stage-detail-table")
   (add-component [component:sample-stage-input-form]
                  "sample-stage-input-form"))
+
+(defn main
+  []
+  (dispatch-sync [:event/initializing
+                  {:mutable {:resumable (make-resumable-js)}}])
+  (initialize-components @re-frame.db/app-db))

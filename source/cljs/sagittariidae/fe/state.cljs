@@ -29,21 +29,20 @@
                              :file-spec [{:id Int
                                           :file Str
                                           :status (enum :unknown :processing :ready)}]
-                             :upload {:file (maybe js/Object) ;; FIXME [1]
+                             :upload {:file (maybe js/Object) ;; ResumableFile [1]
                                       :progress Num
                                       :state Keyword}}
               :new-stage {:method (maybe (conj method {:label Str
                                                        :value Str}))
                           :annotation Str}}
-     :resumable js/Resumable}))
+     :mutable {:resumable js/Resumable}}))
 
-;; [1] This should be an instance of ResumableFile.  It's constructor function
-;;     is private to ResumableFile and I'm not certain how to get a handle to
-;;     it without resorting to weird reflection contortions.  Fow now I'm just
-;;     resorting to base type for the schema until I can figure out a better
-;;     way.
+;; [1] These should all be specific types of JavaScript objects.  Schema
+;;     requires JS prototype functions to do type matching, and whatever these
+;;     are don't fit the bill.  I need to understand the JS prototyping model
+;;     better and try to figure this out.
 
-(defonce null-state
+(def null-state
   {:cached {:projects []
             :methods []}
    :project {:id ""
@@ -59,7 +58,7 @@
                                     :state :default}}
             :new-stage {:method nil
                         :annotation ""}}
-   :resumable nil})
+   :mutable {:resumable nil}})
 
 (def state
   (reagent/atom null-state))
@@ -83,6 +82,8 @@
         (recur (rest paths)
                (assoc-in dst path (get-in src path))))
       dst)))
+
+;; ------------------------------------------------------- subscriptions --- ;;
 
 (register-sub
  :query/projects

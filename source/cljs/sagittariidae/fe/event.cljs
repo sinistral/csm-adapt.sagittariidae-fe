@@ -6,7 +6,9 @@
             [ajax.core :refer [GET POST PUT]]
             [re-frame.core :refer [dispatch register-handler]]
             [schema.core :refer [validate]]
-            [sagittariidae.fe.state :refer [State clear copy-state null-state]]))
+            [sagittariidae.fe.state :refer [State
+                                            clear copy-state
+                                            null-state]]))
 
 ;; -------------------------------------------------------- server comms --- ;;
 
@@ -64,18 +66,20 @@
   (fn [state event-vectr]
     (validate State (handler state event-vectr))))
 
-;; ------------------------------------------------ init and static data --- ;;
+;; ---------------------------------------------------------------- init --- ;;
 
 (register-handler
- :event/initialising
+ :event/initializing
  [validate-state]
- (fn [state [_ res]]
+ (fn [state [_ initial-state]]
    (ajax-get ["projects"] {:handler #(dispatch [:event/projects-retrieved %])})
    (ajax-get ["methods"] {:handler #(dispatch [:event/methods-retrieved %])})
    (-> (if (empty? state)
          null-state
          state)
-       (assoc :resumable res))))
+       (conj initial-state))))
+
+;; --- static data --------------------------------------------------------- ;;
 
 (register-handler
  :event/methods-retrieved
@@ -97,7 +101,7 @@
  (fn [state [_ project]]
    (-> null-state
        (copy-state state [[:cached]
-                          [:resumable]])
+                          [:mutable]])
        (assoc :project project))))
 
 ;; ---------------------------------------------------- sample ID search --- ;;
@@ -108,7 +112,7 @@
  (fn [state [_ sample-name]]
    (-> null-state
        (copy-state state [[:cached]
-                          [:resumable]
+                          [:mutable]
                           [:project]])
        (assoc-in [:sample :name] sample-name))))
 
@@ -232,7 +236,8 @@
  :event/upload-file-complete
  (fn [state _]
    (.debug js/console "file upload complete: " (get-in state (conj upload-path :file)))
-   (.removeFile (:resumable state) (get-in state (conj upload-path :file)))
+   (.removeFile (get-in state [:mutable :resumable])
+                (get-in state (conj upload-path :file)))
    (let [new-state (assoc-in state (conj upload-path :state) :success)]
      (.debug js/console "state @ file upload completion is:" (clj->js new-state))
      (assoc-in new-state (conj upload-path :progress) 1)
@@ -242,7 +247,7 @@
  :event/upload-file-error
  (fn [state [_ msg file]]
    (.debug js/console "File upload error!: " msg)
-   (.cancel (:resumable state))
+   (.cancel (get-in state [:mutable :resumable]))
    (let [new-state (-> state
                        (assoc-in (conj upload-path :progress) 1)
                        (assoc-in (conj upload-path :state) :error))]
