@@ -86,6 +86,14 @@
 ;; ------------------------------------------------------- subscriptions --- ;;
 
 (register-sub
+ :query/ui-enabled?
+ (fn [state [query-id]]
+   (assert (= query-id :query/ui-enabled?))
+   (letfn [(neither-nil-nor-empty? [x]
+             (and (not (nil? x)) (not (empty? x))))]
+     (reaction (neither-nil-nor-empty? (:name (:project @state)))))))
+
+(register-sub
  :query/projects
  (fn [state [query-id]]
    (assert (= query-id :query/projects))

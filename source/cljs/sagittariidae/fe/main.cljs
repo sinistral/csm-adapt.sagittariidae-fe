@@ -77,37 +77,42 @@
                      [:td (data-fn (get row colkey) row)])))])))]))])
 
 (defn component:text-input-action
-  [placeholder value on-change on-click]
+  [{:keys [placeholder value on-change on-click enabled?]
+    :or   {enabled true}}]
   [:div.input-group
    [:input.form-control
     {:type        "text"
      :placeholder placeholder
      :value       value
-     :on-change   #(on-change (-> % .-target .-value))}]
+     :on-change   #(on-change (-> % .-target .-value))
+     :disabled    (not enabled?)}]
    [:span.input-group-btn
     [:button.btn.btn-default
      {:type       "button"
-      :on-click   #(on-click)}
+      :on-click   #(on-click)
+      :disabled   (not enabled?)}
      [:span.glyphicon.glyphicon-download]]]])
 
 (defn component:select
-  [selection-opts initial-value]
-  [select {:options   selection-opts
-           :value     initial-value
-           :on-change #(dispatch [:event/stage-method-selected %])}])
+  [{:keys [options value enabled?]}]
+  [select {:options   options
+           :value     value
+           :on-change #(dispatch [:event/stage-method-selected %])
+           :disabled  (not enabled?)}])
 
 ;; ------------------------------------------------ top level components --- ;;
 
 (defn component:sample-search
   []
-  (let [sample-id (subscribe [:query/sample-id])]
+  (let [enabled?  (subscribe [:query/ui-enabled?])
+        sample-id (subscribe [:query/sample-id])]
     (fn []
-      (let [change #(dispatch [:event/sample-name-changed %])
-            click #(dispatch [:event/sample-name-search-requested])]
-        (component:text-input-action "Search for a sample ..."
-                                     (:name @sample-id)
-                                     change
-                                     click)))))
+      [component:text-input-action
+       {:placeholder "Search for a sample ..."
+        :value       (:name @sample-id)
+        :on-change   #(dispatch [:event/sample-name-changed %])
+        :on-click    #(dispatch [:event/sample-name-search-requested])
+        :enabled?    @enabled?}])))
 
 (defn component:sample-stage-detail-table
   []
@@ -119,15 +124,23 @@
 
 (defn component:sample-stage-detail-upload-add-file-button
   [id]
-  [button {:id    id
-           :title "Select a file to upload."}
-   [glyph-icon {:glyph "file"}]])
+  (let [enabled? (subscribe [:query/ui-enabled?])
+        stages   (subscribe [:query/sample-stages])]
+    (fn []
+      [button {:id       id
+               :title    "Select a file to upload."
+               :disabled (or (not @enabled?) (nil? (:active @stages)))}
+       [glyph-icon {:glyph "file"}]])))
 
 (defn component:sample-stage-detail-upload-upload-file-button
   [res]
-  [button {:title    "Upload the selected file."
-           :on-click #(.upload res)}
-   [glyph-icon {:glyph "upload"}]])
+  (let [enabled? (subscribe [:query/ui-enabled?])
+        stages   (subscribe [:query/sample-stages])]
+    (fn []
+      [button {:title    "Upload the selected file."
+               :on-click #(.upload res)
+               :disabled (or (not @enabled?) (nil? (:active @stages)))}
+       [glyph-icon {:glyph "upload"}]])))
 
 (defn component:sample-stage-detail-upload-form
   [btn-add btn-upl]
@@ -170,30 +183,35 @@
 
 (defn component:sample-stage-input-form
   []
-  (let [methods  (subscribe [:query/methods])
-        options  (reaction (map #(-> %
-                                     (assoc :value (:id %))
-                                     (assoc :label (:name %1)))
-                                @methods))
+  (let [enabled?  (subscribe [:query/ui-enabled?])
+        methods   (subscribe [:query/methods])
+        options   (reaction (map #(-> %
+                                      (assoc :value (:id %))
+                                      (assoc :label (:name %1)))
+                                 @methods))
         new-stage (subscribe [:query/sample-stage-input])]
     (fn []
       (let [{:keys [id method annotation]} @new-stage]
         [:div
          [row
           [column {:md 4}
-           [component:select @options (:value method)]]
+           [component:select {:options  @options
+                              :value    (:value method)
+                              :enabled? @enabled?}]]
           [column {:md 8}
            [form-control {:type        "text"
                           :placeholder "Annotation ..."
                           :value       annotation
                           :on-change   #(dispatch [:event/stage-annotation-changed
-                                                   (-> % .-target .-value)])}]]]
+                                                   (-> % .-target .-value)])
+                          :disabled    (not @enabled?)}]]]
          [row {:style {:padding-top "10px"}}
           [column {:md 2}
            [button {:on-click (fn [_] (dispatch [:event/stage-added
                                                  id
                                                  (:id method)
-                                                 annotation]))}
+                                                 annotation]))
+                    :disabled (not @enabled?)}
             [glyph-icon {:glyph "plus"}]]]]]))))
 
 (defn component:sample-stage-table
@@ -230,10 +248,11 @@
         project-name   (reaction (:name @active-project))]
     (fn []
       [nav-dropdown
-       {:id "nav-project-dropdown"
-        :title (if (or (nil? @project-name) (empty? @project-name))
-                 "Project"
-                 (str "Project: " (:name @active-project)))}
+       {:id       "nav-project-dropdown"
+        :title    (let [prefix "Project"]
+                    (if (or (nil? @project-name) (empty? @project-name))
+                      prefix
+                      (str prefix ": " @project-name)))}
        (for [{:keys [id name] :as project} @projects]
          (let [event [:event/project-selected (select-keys project [:id :name])]]
            ^{:key id} [menu-item {:on-click #(dispatch event)} name]))])))
