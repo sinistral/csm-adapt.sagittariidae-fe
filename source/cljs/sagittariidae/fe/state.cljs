@@ -30,7 +30,7 @@
                                 :sample Str}]
                        :token (maybe Str)}
               :active-stage {:id (maybe Str)
-                             :file-spec [{:id Int
+                             :file-spec [{:id Str
                                           :file Str
                                           :status (enum :unknown :processing :ready)}]
                              :upload {:file (maybe js/Object) ;; ResumableFile [1]
