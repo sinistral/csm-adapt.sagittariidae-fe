@@ -167,13 +167,40 @@
  :event/stage-selected
  [validate-state]
  (fn [state [_ stage-id]]
-   (let [project-id (get-in state [:project :id])
-         sample-id  (get-in state [:sample :id])]
-     (-> state
-         (assoc-in [:sample :active-stage :id]
-                   stage-id)
-         (assoc-in [:sample :active-stage :file-spec]
-                   (b/stage-details project-id sample-id stage-id))))))
+   (ajax-get ["projects"
+              (urify (get-in state [:project :id]))
+              "samples"
+              (urify (get-in state [:sample :id]))
+              "stages"
+              (urify stage-id)
+              "files"]
+             {:handler #(dispatch [:event/stage-details-retrieved %])})
+   (assoc-in state [:sample :active-stage :id] stage-id)))
+
+(register-handler
+ :event/refresh-sample-stage-details
+ [validate-state]
+ (fn [state _]
+   (dispatch [:event/stage-selected (get-in state [:sample :active-stage :id])])
+   state))
+
+(register-handler
+ :event/stage-details-retrieved
+ [validate-state]
+ (fn [state [_ stage-details]]
+   (.info js/console "Retrieved stage details %s" (clj->js (str stage-details)))
+   (let [exp-id (get-in state [:sample :active-stage :id])
+         act-id (:stage-id stage-details)]
+     (if (= exp-id act-id)
+       (let [fmtfn #(assoc % :status (or (#{:processing :ready} (keyword (:status %))) :unknown))
+             files (map fmtfn (:files stage-details))]
+         (when (some #{:processing} (map :status files))
+           (do (.debug js/console "Incomplete stage file detected ... scheduling refresh")
+               (.setTimeout js/window #(dispatch [:event/refresh-sample-stage-details]) (* 15 1000))))
+         (assoc-in state [:sample :active-stage :file-spec] files))
+       (do (.info js/console "Actual stage ID '%s' does not match expected stage ID '%s'; ignoring stage detail update"
+                  act-id exp-id)
+           state)))))
 
 (register-handler
  :event/stage-method-selected
@@ -224,11 +251,12 @@
    (.debug js/console "state @ part upload completion is:" (clj->js state))
    (let [f (get-in state (conj upload-path :file))]
      (ajax-post ["complete-multipart-upload"]
-                {:upload-id (.-uniqueIdentifier f)
-                 :file-name (.-fileName f)
-                 :project   (:project state)
-                 :sample    (get-in state [:sample :id])}
-                {:handler   #(dispatch [:event/upload-file-complete])
+                {:upload-id     (.-uniqueIdentifier f)
+                 :file-name     (.-fileName f)
+                 :project       (:project state)
+                 :sample        (get-in state [:sample :id])
+                 :sample-stage  (get-in state [:sample :active-stage :id])}
+                {:handler       #(dispatch [:event/upload-file-complete])
                  :error-handler #(dispatch [:event/upload-file-error "File upload error" f])}))
    state))
 
@@ -238,6 +266,7 @@
    (.debug js/console "file upload complete: " (get-in state (conj upload-path :file)))
    (.removeFile (get-in state [:mutable :resumable])
                 (get-in state (conj upload-path :file)))
+   (dispatch [:event/refresh-sample-stage-details])
    (let [new-state (assoc-in state (conj upload-path :state) :success)]
      (.debug js/console "state @ file upload completion is:" (clj->js new-state))
      (assoc-in new-state (conj upload-path :progress) 1)

@@ -118,8 +118,16 @@
   []
   (let [sample-stage-detail (subscribe [:query/sample-stage-detail])]
     (fn []
-      (let [spec {:file   {:label "File"}
-                  :status {:label "Status" :data-fn (fn [x _] (name x))}}]
+      (let [spec {:file   {:label   "File"}
+                  :status {:label   "Status"
+                           :data-fn (fn [x _]
+                                      [glyph-icon
+                                       {:glyph (cond (= :processing x)
+                                                     "refresh"
+                                                     (= :ready x)
+                                                     "file"
+                                                     :else
+                                                     "question-sign")}])}}]
         [component:table spec (:file-spec @sample-stage-detail)]))))
 
 (defn component:sample-stage-detail-upload-add-file-button
