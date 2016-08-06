@@ -2,7 +2,6 @@
 (ns sagittariidae.fe.event
   (:require [clojure.string :as s]
             [cljs.pprint :refer [cl-format]]
-            [sagittariidae.fe.backend :as b]
             [ajax.core :refer [GET POST PUT]]
             [re-frame.core :refer [dispatch register-handler]]
             [schema.core :refer [validate]]

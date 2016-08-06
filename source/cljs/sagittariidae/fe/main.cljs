@@ -7,7 +7,6 @@
             [re-frame.core :refer [dispatch dispatch-sync subscribe]]
             [reagent.core :refer [adapt-react-class render]]
             [reagent.ratom :refer-macros [reaction]]
-            [sagittariidae.fe.backend :as b]
 
             [sagittariidae.fe.event]
             [sagittariidae.fe.reagent-utils :as u]))
