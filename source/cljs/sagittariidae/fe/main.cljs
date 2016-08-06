@@ -119,6 +119,7 @@
   (let [sample-stage-detail (subscribe [:query/sample-stage-detail])]
     (fn []
       (let [spec {:file   {:label   "File"}
+                  :mtime  {:label   "Uploaded"}
                   :status {:label   "Status"
                            :data-fn (fn [x _]
                                       [glyph-icon

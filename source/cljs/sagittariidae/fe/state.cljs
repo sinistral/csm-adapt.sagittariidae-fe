@@ -32,6 +32,7 @@
               :active-stage {:id (maybe Str)
                              :file-spec [{:id Str
                                           :file Str
+                                          :mtime Str
                                           :status (enum :unknown :processing :ready)}]
                              :upload {:file (maybe js/Object) ;; ResumableFile [1]
                                       :progress Num
