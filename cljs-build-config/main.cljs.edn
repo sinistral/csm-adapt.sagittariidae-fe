@@ -1,5 +1,4 @@
-{:require  [sagittariidae.fe.backend
-            sagittariidae.fe.event
+{:require  [sagittariidae.fe.event
             sagittariidae.fe.reagent-utils
             sagittariidae.fe.main
             sagittariidae.fe.state]
