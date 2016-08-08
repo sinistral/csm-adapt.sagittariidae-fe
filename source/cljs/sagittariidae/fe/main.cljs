@@ -150,8 +150,18 @@
                :disabled (or (not @enabled?) (nil? (:active @stages)))}
        [glyph-icon {:glyph "upload"}]])))
 
+(defn component:sample-stage-detail-upload-cancel-file-button
+  [res]
+  (let [enabled? (subscribe [:query/ui-enabled?])
+        stages   (subscribe [:query/sample-stages])]
+    (fn []
+      [button {:title    "Cancel the current file upload."
+               :on-click #(.cancel res)
+               :disabled (or (not @enabled?) (nil? (:active @stages)))}
+       [glyph-icon {:glyph "remove"}]])))
+
 (defn component:sample-stage-detail-upload-form
-  [btn-add btn-upl]
+  [btn-add btn-upload btn-cancel]
   (let [detail     (subscribe [:query/sample-stage-detail])
         filename   (reaction (if-let [f (get-in @detail [:upload :file])]
                                (.-fileName f)
@@ -176,8 +186,10 @@
         [column {:md 1}
          btn-add]
         [column {:md 1}
-         btn-upl]
-        [column {:md 10}
+         btn-upload]
+        [column {:md 1}
+         btn-cancel]
+        [column {:md 9}
          [:div.progress
           {:id "stage-file-upload-progress"
            :style {:height "34px"}}
@@ -309,7 +321,7 @@
                       ;; Thus the upload has to finish within the Keep-Alive
                       ;; timeout, since the server isn't streaming Keep-Alive
                       ;; data back to us while the upload is in progress.
-                      :simultaneousUploads 1
+                      :simultaneousUploads 3
                       :chunkSize           (* 128 1024)}))
 
 (defn- initialize-components
@@ -321,14 +333,15 @@
     (let [add-id "sample-stage-detail-upload-add-file-button"]
       (add-component [component:sample-stage-detail-upload-form
                       [component:sample-stage-detail-upload-add-file-button add-id]
-                      [component:sample-stage-detail-upload-upload-file-button res]]
+                      [component:sample-stage-detail-upload-upload-file-button res]
+                      [component:sample-stage-detail-upload-cancel-file-button res]]
                      "sample-stage-detail-upload-form")
       (doto res
         ;; Component configuration
         (.assignBrowse (clj->js [(by-id add-id)]))
         ;; Callback configuration
-        (.on "complete"
-             (fn []
+        (.on "fileSuccess"
+             (fn [f]
                (dispatch [:event/upload-file-parts-complete])))
         (.on "error"
              (fn [m f]
