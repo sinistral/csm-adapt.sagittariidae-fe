@@ -122,10 +122,13 @@
     (fn []
       [dropdown-button {:id       "sample-select"
                         :title    (let [sample-id (:id @selected-sample)]
-                                    (if (or (empty? sample-id))
-                                      "Select sample ..."
-                                      (:name @selected-sample)))
-                        :disabled false}
+                                    (cond (empty? @search-results)
+                                          "Search for a sample"
+                                          (empty? sample-id)
+                                          "Select sample ..."
+                                          :else
+                                          (:name @selected-sample)))
+                        :disabled (or (not @enabled?) (empty? @search-results))}
        (for [{:keys [id name] :as sample} @search-results]
          (let [event [:event/sample-selected sample]]
            ^{:key id} [menu-item {:on-click #(dispatch event)} name]))])))
