@@ -140,14 +140,14 @@
       (let [spec {:file   {:label   "File"}
                   :mtime  {:label   "Uploaded"}
                   :status {:label   "Status"
-                           :data-fn (fn [x _]
-                                      [glyph-icon
-                                       {:glyph (cond (= :processing x)
-                                                     "refresh"
-                                                     (= :ready x)
-                                                     "file"
-                                                     :else
-                                                     "question-sign")}])}}]
+                           :data-fn (fn [x rec]
+                                      (cond (= :processing x)
+                                            [glyph-icon {:glyph "refresh"}]
+                                            (= :ready x)
+                                            [:a {:href (get rec :uri)}
+                                             [glyph-icon {:glyph "file"}]]
+                                            :else
+                                            [glyph-icon {:glyph "question-sign"}]))}}]
         [component:table spec (:file-spec @sample-stage-detail)]))))
 
 (defn component:sample-stage-detail-upload-add-file-button
