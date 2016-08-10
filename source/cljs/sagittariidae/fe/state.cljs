@@ -21,8 +21,11 @@
                           :name Str
                           :sample-mask Str}]
               :methods [method]}
-     :sample {:id Str
-              :name Str
+     :search-terms Str
+     :search-results [{:id Str
+                       :name Str}]
+     :sample {:selected {:id Str
+                         :name Str}
               :stages {:list  [{:id Str
                                 :method Str
                                 :annotation Str
@@ -54,8 +57,10 @@
             :methods []}
    :project {:id ""
              :name ""}
-   :sample {:id ""
-            :name ""
+   :search-terms ""
+   :search-results []
+   :sample {:selected {:id ""
+                       :name ""}
             :stages {:list []
                      :token nil}
             :active-stage {:id nil
@@ -128,10 +133,22 @@
    (reaction (:project @state))))
 
 (register-sub
- :query/sample-id
+ :query/sample-search-terms
  (fn [state [query-id]]
-   (assert (= query-id :query/sample-id))
-   (reaction (select-keys (:sample @state) [:id :name]))))
+   (assert (= query-id :query/sample-search-terms))
+   (reaction (get-in @state [:search-terms]))))
+
+(register-sub
+ :query/sample-search-results
+ (fn [state [query-id]]
+   (assert (= query-id :query/sample-search-results))
+   (reaction (get @state :search-results))))
+
+(register-sub
+ :query/selected-sample
+ (fn [state [query-id]]
+   (assert (= query-id :query/selected-sample))
+   (reaction (get-in @state [:sample :selected]))))
 
 (register-sub
  :query/sample-stages
