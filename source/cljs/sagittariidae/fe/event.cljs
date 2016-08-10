@@ -103,56 +103,59 @@
                           [:mutable]])
        (assoc :project project))))
 
-;; ---------------------------------------------------- sample ID search --- ;;
+;; ------------------------------------------------------- sample search --- ;;
 
 (register-handler
- :event/sample-name-changed
+ :event/sample-search-terms-changed
  [validate-state]
  (fn [state [_ sample-name]]
    (-> null-state
        (copy-state state [[:cached]
                           [:mutable]
                           [:project]])
-       (assoc-in [:sample :name] sample-name))))
+       (assoc :search-terms sample-name))))
 
 (register-handler
- :event/sample-name-search-requested
+ :event/sample-search-requested
  [validate-state]
  (fn [state _]
    (ajax-get ["projects"
               (urify (get-in state [:project :id]))
-              (str "samples?name=" (urify (get-in state [:sample :name])))]
-             {:handler #(dispatch [:event/sample-retrieved %])})
+              (str "samples?q=" (urify (get state :search-terms)))]
+             {:handler #(dispatch [:event/samples-retrieved %])})
    state))
 
 (register-handler
- :event/sample-retrieved
+ :event/samples-retrieved
+ [validate-state]
+ (fn [state [_ samples]]
+   (.info js/console "Search returned %d samples" (count samples))
+   (assoc state :search-results (map #(select-keys % [:id :name]) samples))))
+
+(register-handler
+ :event/sample-selected
  [validate-state]
  (fn [state [_ sample]]
-   (.info js/console "Retrieved sample details" (clj->js sample))
-   (let [expected-id (get-in state [:sample :name])
-         actual-id   (:name sample)]
-     (if (= expected-id actual-id)
-       (do
-         (ajax-get ["projects"
-                    (urify (get-in state [:project :id]))
-                    "samples"
-                    (urify (:id sample))
-                    "stages"]
-                   {:handler #(dispatch [:event/sample-stages-retrieved %])})
-         (assoc-in state [:sample :id] (:id sample)))
-       (do
-         (.warn js/console "Details for sample %s are not for expected sample %s" actual-id expected-id)
-         state)))))
+   (.info js/console "Retrieving sample details" (clj->js sample))
+   (ajax-get ["projects"
+              (urify (get-in state [:project :id]))
+              "samples"
+              (urify (:id sample))
+              "stages"]
+             {:handler #(dispatch [:event/sample-stages-retrieved %])})
+   (assoc-in state [:sample :selected] sample)))
 
 (register-handler
  :event/sample-stages-retrieved
  [validate-state]
  (fn [state [_ rsp]]
-   (.info js/console "Retrieved sample stages" (clj->js rsp))
+   (.info js/console "Retrieved stages for sample"
+          (clj->js (get-in state [:sample :selected]))
+          (clj->js rsp))
+   (.debug js/console "Expecting stages for sample: %s" (get-in state [:sample :selected :id]))
    (when-let [stages (:stages rsp)]
-     (let [expected-id (get-in state [:sample :id])
-           actual-id   (:sample (first stages))]
+     (let [expected-id (get-in state [:sample :selected :id])
+           actual-id   (:sample rsp)]
        (if (= expected-id actual-id)
          (-> state
              (assoc-in [:sample :stages :list] stages)
@@ -169,7 +172,7 @@
    (ajax-get ["projects"
               (urify (get-in state [:project :id]))
               "samples"
-              (urify (get-in state [:sample :id]))
+              (urify (get-in state [:sample :selected :id]))
               "stages"
               (urify stage-id)
               "files"]
@@ -221,7 +224,7 @@
          annotation (s/trim (or a ""))]
      (when (and (not (empty? method)) (not (empty? annotation)))
        (let [project-id (get-in state [:project :id])
-             sample-id  (get-in state [:sample :id])]
+             sample-id  (get-in state [:sample :selected :id])]
          (.info js/console
                 "Adding stage for sample %s,%s: method=%s, annotation=%s"
                 project-id sample-id method annotation)
@@ -237,7 +240,7 @@
  :event/stage-persisted
  [validate-state]
  (fn [state [_ new-stage]]
-   (dispatch [:event/sample-name-search-requested])
+   (dispatch [:event/sample-selected (get-in state [:sample :selected])])
    (copy-state state null-state [[:sample :new-stage]])))
 
 ;; ------------------------------------------- sample stage detail input --- ;;
@@ -253,7 +256,7 @@
                 {:upload-id     (.-uniqueIdentifier f)
                  :file-name     (.-fileName f)
                  :project       (:project state)
-                 :sample        (get-in state [:sample :id])
+                 :sample        (get-in state [:sample :selected :id])
                  :sample-stage  (get-in state [:sample :active-stage :id])}
                 {:handler       #(dispatch [:event/upload-file-complete])
                  :error-handler #(dispatch [:event/upload-file-error "File upload error" f])}))
