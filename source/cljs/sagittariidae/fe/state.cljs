@@ -33,7 +33,8 @@
                              :file-spec [{:id Str
                                           :file Str
                                           :mtime Str
-                                          :status (enum :unknown :processing :ready)}]
+                                          :status (enum :unknown :processing :ready)
+                                          :uri Str}]
                              :upload {:file (maybe js/Object) ;; ResumableFile [1]
                                       :progress Num
                                       :state Keyword}}
