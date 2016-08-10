@@ -18,17 +18,18 @@
   [c]
   (adapt-react-class (aget js/ReactBootstrap (str c))))
 
-(def button        (react-bootstrap->reagent 'Button))
-(def column        (react-bootstrap->reagent 'Col))
-(def form-control  (react-bootstrap->reagent 'FormControl))
-(def glyph-icon    (react-bootstrap->reagent 'Glyphicon))
-(def grid          (react-bootstrap->reagent 'Grid))
-(def menu-item     (react-bootstrap->reagent 'MenuItem))
-(def nav-dropdown  (react-bootstrap->reagent 'NavDropdown))
-(def progress-bar  (react-bootstrap->reagent 'ProgressBar))
-(def row           (react-bootstrap->reagent 'Row))
+(def button          (react-bootstrap->reagent 'Button))
+(def column          (react-bootstrap->reagent 'Col))
+(def dropdown-button (react-bootstrap->reagent 'DropdownButton))
+(def form-control    (react-bootstrap->reagent 'FormControl))
+(def glyph-icon      (react-bootstrap->reagent 'Glyphicon))
+(def grid            (react-bootstrap->reagent 'Grid))
+(def menu-item       (react-bootstrap->reagent 'MenuItem))
+(def nav-dropdown    (react-bootstrap->reagent 'NavDropdown))
+(def progress-bar    (react-bootstrap->reagent 'ProgressBar))
+(def row             (react-bootstrap->reagent 'Row))
 
-(def select        (adapt-react-class js/Select))
+(def select          (adapt-react-class js/Select))
 
 ;; ----------------------------------------------- composable components --- ;;
 
@@ -104,15 +105,31 @@
 
 (defn component:sample-search
   []
-  (let [enabled?  (subscribe [:query/ui-enabled?])
-        sample-id (subscribe [:query/sample-id])]
+  (let [enabled? (subscribe [:query/ui-enabled?])
+        terms    (subscribe [:query/sample-search-terms])]
     (fn []
       [component:text-input-action
        {:placeholder "Search for a sample ..."
-        :value       (:name @sample-id)
-        :on-change   #(dispatch [:event/sample-name-changed %])
-        :on-click    #(dispatch [:event/sample-name-search-requested])
+        :value       @terms
+        :on-change   #(dispatch [:event/sample-search-terms-changed %])
+        :on-click    #(dispatch [:event/sample-search-requested])
         :enabled?    @enabled?}])))
+
+(defn component:sample-select
+  []
+  (let [enabled?        (subscribe [:query/ui-enabled?])
+        selected-sample (subscribe [:query/selected-sample])
+        search-results  (subscribe [:query/sample-search-results])]
+    (fn []
+      [dropdown-button {:id       "sample-select"
+                        :title    (let [sample-id (:id @selected-sample)]
+                                    (if (or (empty? sample-id))
+                                      "Select sample ..."
+                                      (:name @selected-sample)))
+                        :disabled false}
+       (for [{:keys [id name] :as sample} @search-results]
+         (let [event [:event/sample-selected sample]]
+           ^{:key id} [menu-item {:on-click #(dispatch event)} name]))])))
 
 (defn component:sample-stage-detail-table
   []
@@ -400,6 +417,8 @@
                  "nav-project-dropdown")
   (add-component [component:sample-search]
                  "sample-search-bar")
+  (add-component [component:sample-select]
+                 "sample-select-dropdown")
   (add-component [component:sample-stage-table]
                  "sample-detail-table")
   (add-component [component:sample-stage-detail-table]
