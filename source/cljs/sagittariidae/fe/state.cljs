@@ -1,10 +1,10 @@
 
 (ns sagittariidae.fe.state
   (:require [re-frame.core :refer [register-sub]]
-            [reagent.core :as reagent]
+            [reagent.core  :as reagent]
             [reagent.ratom :refer-macros [reaction]]
-            [schema.core :refer [Int Keyword Num Str
-                                 enum maybe]]))
+            [schema.core   :refer [Int Keyword Num Str
+                                   enum maybe]]))
 
 (def State
   "The Prismatic Schema for the Sagittariidae application state."
@@ -34,13 +34,15 @@
                                           :mtime Str
                                           :status (enum :unknown :processing :ready)
                                           :uri Str}]
-                             :upload {:file (maybe js/Object) ;; ResumableFile [1]
+                             :upload {:file (maybe js/Object) ; ResumableFile [1]
                                       :progress Num
                                       :state Keyword}}
               :new-stage {:method (maybe (conj method {:label Str
                                                        :value Str}))
                           :annotation Str}}
-     :mutable {:resumable js/Resumable}}))
+     :volatile {:resumable js/Resumable
+                :digester (maybe js/Object) ; goog.crypt.Sha256 [1]
+                :checksum (maybe Str)}}))
 
 ;; [1] These should all be specific types of JavaScript objects.  Schema
 ;;     requires JS prototype functions to do type matching, and whatever these
@@ -65,7 +67,9 @@
                                     :state :default}}
             :new-stage {:method nil
                         :annotation ""}}
-   :mutable {:resumable nil}})
+   :volatile {:resumable nil
+              :digester nil
+              :checksum nil}})
 
 (def state
   (reagent/atom null-state))

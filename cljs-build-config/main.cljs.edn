@@ -1,4 +1,6 @@
-{:require  [sagittariidae.fe.event
+{:require  [sagittariidae.fe.checksum
+            sagittariidae.fe.event
+            sagittariidae.fe.file
             sagittariidae.fe.reagent-utils
             sagittariidae.fe.main
             sagittariidae.fe.state]

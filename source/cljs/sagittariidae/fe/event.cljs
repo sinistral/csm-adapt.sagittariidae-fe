@@ -1,13 +1,17 @@
 
 (ns sagittariidae.fe.event
-  (:require [clojure.string :as s]
-            [cljs.pprint :refer [cl-format]]
-            [ajax.core :refer [GET POST PUT]]
-            [re-frame.core :refer [dispatch register-handler]]
-            [schema.core :refer [validate]]
-            [sagittariidae.fe.state :refer [State
-                                            clear copy-state
-                                            null-state]]))
+  (:require [clojure.string            :as    s]
+
+            [ajax.core                 :refer [GET POST PUT]]
+            [re-frame.core             :refer [dispatch register-handler]]
+            [schema.core               :refer [validate]]
+            [sagittariidae.fe.checksum :refer [array-buffer->utf8-array
+                                               utf8-array->hex-string]]
+            [sagittariidae.fe.file     :refer [process-file-chunks]]
+            [sagittariidae.fe.state    :refer [State
+                                               clear copy-state
+                                               null-state]])
+  (:import [goog.crypt Sha256]))
 
 ;; -------------------------------------------------------- server comms --- ;;
 
@@ -100,7 +104,7 @@
  (fn [state [_ project]]
    (-> null-state
        (copy-state state [[:cached]
-                          [:mutable]])
+                          [:volatile]])
        (assoc :project project))))
 
 ;; ------------------------------------------------------- sample search --- ;;
@@ -111,7 +115,7 @@
  (fn [state [_ sample-name]]
    (-> null-state
        (copy-state state [[:cached]
-                          [:mutable]
+                          [:volatile]
                           [:project]])
        (assoc :search-terms sample-name))))
 
@@ -248,25 +252,56 @@
 (def upload-path [:sample :active-stage :upload])
 
 (register-handler
+ :task/chunking-start
+ [validate-state]
+ (fn [state _]
+   (assoc-in state [:volatile :digester] (Sha256.))))
+
+(register-handler
+ :task/preprocess-chunks
+ [validate-state]
+ (fn [state [_ chunks]]
+   (let [digester (get-in state [:volatile :digester])
+         checksum (fn [chunk buf]
+                    (let [len (count chunks)
+                          cur (+ (.-offset chunk) 1)]
+                      (when (or (= (rem cur 500) 0) (= cur len))
+                        (.debug js/console "Processing chunk %d of %d" cur len))
+                      (.update digester (array-buffer->utf8-array buf))))]
+     (process-file-chunks checksum
+                          nil
+                          (-> (first chunks) .-fileObj .-file) chunks))
+   state))
+
+(register-handler
  :event/upload-file-parts-complete
+ [validate-state]
  (fn [state _]
    (.debug js/console "state @ part upload completion is:" (clj->js state))
    (let [f (get-in state (conj upload-path :file))]
      (ajax-post ["complete-multipart-upload"]
-                {:upload-id     (.-uniqueIdentifier f)
-                 :file-name     (.-fileName f)
-                 :project       (:project state)
-                 :sample        (get-in state [:sample :selected :id])
-                 :sample-stage  (get-in state [:sample :active-stage :id])}
+                {:upload-id       (.-uniqueIdentifier f)
+                 :file-name       (.-fileName f)
+                 :project         (:project state)
+                 :sample          (get-in state [:sample :selected :id])
+                 :sample-stage    (get-in state [:sample :active-stage :id])
+                 :checksum-method :sha256
+                 :checksum-value  (-> state
+                                      (get-in [:volatile :digester])
+                                      (.digest)
+                                      (utf8-array->hex-string))}
                 {:handler       #(dispatch [:event/upload-file-complete])
                  :error-handler #(dispatch [:event/upload-file-error "File upload error" f])}))
-   state))
+   (-> state
+       (copy-state null-state [[:volatile :checksum]])
+       (copy-state null-state [[:volatile :digester]]))))
 
 (register-handler
  :event/upload-file-complete
+ [validate-state]
  (fn [state _]
    (.debug js/console "file upload complete: " (get-in state (conj upload-path :file)))
-   (.removeFile (get-in state [:mutable :resumable])
+   (.removeFile (get-in state [:volatile :resumable])
                 (get-in state (conj upload-path :file)))
    (dispatch [:event/refresh-sample-stage-details])
    (let [new-state (assoc-in state (conj upload-path :state) :success)]
@@ -276,9 +311,10 @@
 
 (register-handler
  :event/upload-file-error
+ [validate-state]
  (fn [state [_ msg file]]
    (.debug js/console "File upload error!: " msg)
-   (.cancel (get-in state [:mutable :resumable]))
+   (.cancel (get-in state [:volatile :resumable]))
    (let [new-state (-> state
                        (assoc-in (conj upload-path :progress) 1)
                        (assoc-in (conj upload-path :state) :error))]
@@ -287,8 +323,9 @@
 
 (register-handler
  :event/upload-file-added
- (.debug js/console "File added for upload.")
+ [validate-state]
  (fn [state [_ f]]
+   (.debug js/console "File added for upload.")
    (let [new-state (-> state
                        (clear    upload-path)
                        (assoc-in (conj upload-path :file) f))]
@@ -297,8 +334,8 @@
 
 (register-handler
  :event/upload-file-progress-updated
+ [validate-state]
  (fn [state [_ n]]
-   ;;
    (if-not (= (get-in state (conj upload-path :state)) :error)
       (assoc-in state (conj upload-path :progress) n)
      state)))
