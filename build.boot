@@ -129,8 +129,9 @@
 
 (deftask install-js-dependencies
   []
-  (let [js-deps {:bootstrap   "3.3.6"
-                 :resumablejs "1.0.2"}]
+  (let [js-deps {:bootstrap     "3.3.6"
+                 :resumablejs   "1.0.2"
+                 :text-encoding "0.6.0"}]
     (comp (bower :install js-deps :directory ".")
           (sift  :include #{#"^.bowerrc$" #"^bower.json$"} :invert true))))
 

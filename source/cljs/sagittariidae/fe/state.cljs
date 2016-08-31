@@ -1,10 +1,10 @@
 
 (ns sagittariidae.fe.state
   (:require [re-frame.core :refer [register-sub]]
-            [reagent.core :as reagent]
+            [reagent.core  :as reagent]
             [reagent.ratom :refer-macros [reaction]]
-            [schema.core :refer [Int Keyword Num Str
-                                 enum maybe]]))
+            [schema.core   :refer [Int Keyword Num Str
+                                   enum maybe]]))
 
 (def State
   "The Prismatic Schema for the Sagittariidae application state."
@@ -44,8 +44,9 @@
               :new-stage {:method (maybe (conj method {:label Str
                                                        :value Str}))
                           :annotation Str}}
-     :mutable {:resumable js/Resumable
-               :firebase-app js/Object}})) ;; firebase.app.App [1]
+     :volatile {:resumable js/Resumable
+                :digester (maybe js/Object) ;; goog.crypt.Sha256 [1]
+                :firebase-app js/Object}})) ;; firebase.app.App [1]
 
 ;; [1] These should all be specific types of JavaScript objects.  Schema
 ;;     requires JS prototype functions to do type matching, and whatever these
@@ -71,8 +72,9 @@
                                     :state :default}}
             :new-stage {:method nil
                         :annotation ""}}
-   :mutable {:resumable nil
-             :firebase-app nil}})
+   :volatile {:resumable nil
+              :digester nil
+              :firebase-app nil}})
 
 (def state
   (reagent/atom null-state))
@@ -177,7 +179,7 @@
 
 ;; For the sake of convenience we do store mutable (JavaScript) objects in the
 ;; application state, even though this isn't really best practice.  Such data
-;; are stored under the `:mutable` tree to flag to clients that they are
+;; are stored under the `:volatile` tree to flag to clients that they are
 ;; unsafe.  To reinforce this distinction, we do not provide subscriptions to
 ;; these data; this wouldn't make sense anyway, since mutable data can change
 ;; without the (r)atom's knowledge.  Rather, we provide standard fns as
@@ -187,4 +189,10 @@
   ([]
    (authenticator @re-frame.db/app-db))
   ([state]
-   (.auth (get-in state [:mutable :firebase-app]))))
+   (.auth (get-in state [:volatile :firebase-app]))))
+
+(defn get-checksum
+  ([chunk]
+   (get-checksum @re-frame.db/app-db chunk))
+  ([state chunk]
+   (get @(get-in state [:volatile :checksum]) (.-offset chunk))))

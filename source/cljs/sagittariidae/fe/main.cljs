@@ -5,11 +5,12 @@
             [cljsjs.react-select]
 
             [clojure.string :as str]
-            [re-frame.core :refer [dispatch dispatch-sync subscribe]]
-            [reagent.core :refer [adapt-react-class render]]
-            [reagent.ratom :refer-macros [reaction]]
+            [re-frame.core  :refer [dispatch dispatch-sync subscribe]]
+            [reagent.core   :refer [adapt-react-class render]]
+            [reagent.ratom  :refer-macros [reaction]]
 
             [sagittariidae.fe.event]
+            [sagittariidae.fe.state         :refer [get-checksum null-state]]
             [sagittariidae.fe.reagent-utils :as u]))
 
 ;; -------------------------------------------------- adapted components --- ;;
@@ -330,40 +331,53 @@
 
 (defn- make-resumable-js
   []
-  (js/Resumable. #js {:target "http://localhost:5000/upload-part"
+  (let [;; Here are defined functions that generate additional parameters to be
+        ;; included in the POST request form data when a chunk is uploaded.
+        ;; Each function must accept a single argument: a `ResumableChunk`
+        ;; object.
+        datafns [(fn [chunk]
+                   {:checksum-method :sha256
+                    :checksum-value  (get-checksum chunk)})]]
+    (js/Resumable. #js {:target "http://localhost:5000/upload-part"
 
-                      ;; The current version of Resumable doesn't support these
-                      ;; options but they are available in mainline.  It would
-                      ;; be nice to put them in place when they do become
-                      ;; available, because it would clean up the API and make
-                      ;; it less Resumable-specific.
-                      ;;
-                      ;; :currentChunkSizeParameterName "part-size"
-                      ;; :chunkNumberParameterName      "part-number"
-                      ;; :totalChunksParameterName      "total-parts"
-                      ;; :totalSizeParameterName        "file-size"
-                      ;; :identifierParameterName       "upload-id"
-                      ;; :fileNameParameterName         "file-name"
-                      ;; :typeParameterName             "file-type"
+                        ;; FIXME: Resumable v1.0.2 doesn't support these
+                        ;; options but they are available in mainline.  It
+                        ;; would be nice to put them in place when they do
+                        ;; become available, because it would clean up the API
+                        ;; and make it less Resumable-specific.
+                        ;;
+                        ;; :currentChunkSizeParameterName "part-size"
+                        ;; :chunkNumberParameterName      "part-number"
+                        ;; :totalChunksParameterName      "total-parts"
+                        ;; :totalSizeParameterName        "file-size"
+                        ;; :identifierParameterName       "upload-id"
+                        ;; :fileNameParameterName         "file-name"
+                        ;; :typeParameterName             "file-type"
 
-                      :testChunks                    false
-                      :maxFiles                      1
-                      :maxChunkRetries               9
-                      :chunkRetryInterval            900
+                        :testChunks         false
+                        :maxFiles           1
+                        :maxChunkRetries    9
+                        :chunkRetryInterval 900
 
-                      ;; Large uploads with many simultaneous connections tend
-                      ;; to result in 'network connection was lost' errors.
-                      ;; Various articles point the finger at Safari/MacOS
-                      ;; (I've seen the same error in Chrome on MacOS) not
-                      ;; handling Keep-Alive connections correctly.
-                      ;;
-                      ;; What I think is happening here though is that the
-                      ;; server follow a strict request-response protocol.
-                      ;; Thus the upload has to finish within the Keep-Alive
-                      ;; timeout, since the server isn't streaming Keep-Alive
-                      ;; data back to us while the upload is in progress.
-                      :simultaneousUploads 3
-                      :chunkSize           (* 128 1024)}))
+                        :query (fn [_ chunk]
+                                 (clj->js
+                                  (doall
+                                   (apply merge (map #(% chunk) datafns)))))
+
+                        ;; Large uploads with many simultaneous connections
+                        ;; tend to result in 'network connection was lost'
+                        ;; errors.  Various articles point the finger at
+                        ;; Safari/MacOS (I've seen the same error in Chrome on
+                        ;; MacOS) not handling Keep-Alive connections
+                        ;; correctly.
+                        ;;
+                        ;; What I think is happening here though is that the
+                        ;; server follow a strict request-response protocol.
+                        ;; Thus the upload has to finish within the Keep-Alive
+                        ;; timeout, since the server isn't streaming Keep-Alive
+                        ;; data back to us while the upload is in progress.
+                        :simultaneousUploads 3
+                        :chunkSize           (* 512 1024)})))
 
 (defn- make-firebase-app
   []
@@ -384,7 +398,7 @@
   ;; Initialise the application state so that components have sensible defaults
   ;; for their first render.  Synchronous "dispatch" ensures that the
   ;; initialisation is complete before any of the components are created.
-  (let [res (get-in state [:mutable :resumable])]
+  (let [res (get-in state [:volatile :resumable])]
     (let [add-id "sample-stage-detail-upload-add-file-button"]
       (add-component [component:sample-stage-detail-upload-form
                       [component:sample-stage-detail-upload-add-file-button add-id]
@@ -394,10 +408,15 @@
       (doto res
         ;; Component configuration
         (.assignBrowse (clj->js [(by-id add-id)]))
+
         ;; Callback configuration
-        (.on "fileSuccess"
+        (.on "chunkingComplete"
+             ;; FIXME: https://github.com/csm-adapt/sagittariidae-fe/issues/4
              (fn [f]
-               (dispatch [:event/upload-file-parts-complete])))
+               (dispatch [:task/preprocess-chunks (.-chunks f)])))
+        (.on "chunkingStart"
+             (fn [f]
+               (dispatch [:task/chunking-start])))
         (.on "error"
              (fn [m f]
                (dispatch [:event/upload-file-error m f])))
@@ -410,6 +429,9 @@
         (.on "fileRetry"
              (fn [f]
                (.warn js/console "Resumable upload retry: " f)))
+        (.on "fileSuccess"
+             (fn [f]
+               (dispatch [:event/upload-file-parts-complete])))
         (.on "progress"
              (fn []
                (dispatch [:event/upload-file-progress-updated (.progress res)])))
@@ -434,8 +456,9 @@
   (let [resumable (make-resumable-js)
         [firebase init-firebase?] (make-firebase-app)]
     (dispatch-sync [:event/initialising
-                    {:mutable {:resumable resumable
-                               :firebase-app firebase}}])
+                    {:volatile (merge (get null-state :volatile)
+                                      {:resumable resumable
+                                       :firebase-app firebase})}])
     ;; Firebase nitialisation is deferred because it triggers event that update
     ;; the app state, so it can't be done until the application state itself
     ;; has been initialised.
