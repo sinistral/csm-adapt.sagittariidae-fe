@@ -255,7 +255,9 @@
  :task/chunking-start
  [validate-state]
  (fn [state _]
-   (assoc-in state [:volatile :digester] (Sha256.))))
+   (-> state
+       (copy-state null-state [upload-path])
+       (assoc-in [:volatile :digester] (Sha256.)))))
 
 (register-handler
  :task/preprocess-chunks
@@ -267,11 +269,30 @@
                           cur (+ (.-offset chunk) 1)]
                       (when (or (= (rem cur 500) 0) (= cur len))
                         (.debug js/console "Processing chunk %d of %d" cur len))
-                      (.update digester (array-buffer->utf8-array buf))))]
-     (process-file-chunks checksum
-                          nil
-                          (-> (first chunks) .-fileObj .-file) chunks))
+                      (.update digester (array-buffer->utf8-array buf))
+                      (dispatch [:event/upload-file-chunk-digested cur len])))
+         complete (fn []
+                    (let [hex (utf8-array->hex-string (.digest digester))]
+                      (dispatch [:event/upload-file-checksum-computed hex])))]
+     (process-file-chunks
+      checksum complete (-> (first chunks) .-fileObj .-file) chunks))
    state))
+
+(register-handler
+ :event/upload-file-chunk-digested
+ [validate-state]
+ (fn [state [_ n cnt]]
+   (assoc-in state (conj upload-path :checksum :progress) (/ n cnt))))
+
+(register-handler
+ :event/upload-file-checksum-computed
+ [validate-state]
+ (fn [state [_ checksum]]
+   (.info js/console "Generated checksum" checksum)
+   (-> state
+       (assoc-in (conj upload-path :checksum :value) checksum)
+       (assoc-in (conj upload-path :checksum :state) :success)
+       (assoc-in (conj upload-path :checksum :progress) 1))))
 
 (register-handler
  :event/upload-file-parts-complete
@@ -286,14 +307,10 @@
                  :sample          (get-in state [:sample :selected :id])
                  :sample-stage    (get-in state [:sample :active-stage :id])
                  :checksum-method :sha256
-                 :checksum-value  (-> state
-                                      (get-in [:volatile :digester])
-                                      (.digest)
-                                      (utf8-array->hex-string))}
-                {:handler       #(dispatch [:event/upload-file-complete])
-                 :error-handler #(dispatch [:event/upload-file-error "File upload error" f])}))
+                 :checksum-value  (-> state (get-in (conj upload-path :checksum :value)))}
+                {:handler         #(dispatch [:event/upload-file-complete])
+                 :error-handler   #(dispatch [:event/upload-file-error "File upload error" f])}))
    (-> state
-       (copy-state null-state [[:volatile :checksum]])
        (copy-state null-state [[:volatile :digester]]))))
 
 (register-handler
@@ -304,9 +321,9 @@
    (.removeFile (get-in state [:volatile :resumable])
                 (get-in state (conj upload-path :file)))
    (dispatch [:event/refresh-sample-stage-details])
-   (let [new-state (assoc-in state (conj upload-path :state) :success)]
+   (let [new-state (assoc-in state (conj upload-path :transmit :state) :success)]
      (.debug js/console "state @ file upload completion is:" (clj->js new-state))
-     (assoc-in new-state (conj upload-path :progress) 1)
+     (assoc-in new-state (conj upload-path :transmit :progress) 1)
      new-state)))
 
 (register-handler
@@ -316,8 +333,8 @@
    (.debug js/console "File upload error!: " msg)
    (.cancel (get-in state [:volatile :resumable]))
    (let [new-state (-> state
-                       (assoc-in (conj upload-path :progress) 1)
-                       (assoc-in (conj upload-path :state) :error))]
+                       (assoc-in (conj upload-path :transmit :progress) 1)
+                       (assoc-in (conj upload-path :transmit :state) :error))]
      (.debug js/console "state @ file upload error is:" (clj->js new-state))
      new-state)))
 
@@ -336,6 +353,6 @@
  :event/upload-file-progress-updated
  [validate-state]
  (fn [state [_ n]]
-   (if-not (= (get-in state (conj upload-path :state)) :error)
-      (assoc-in state (conj upload-path :progress) n)
+   (if-not (= (get-in state (conj upload-path :transmit :state)) :error)
+      (assoc-in state (conj upload-path :transmit :progress) n)
      state)))

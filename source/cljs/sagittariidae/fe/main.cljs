@@ -183,18 +183,20 @@
 
 (defn component:sample-stage-detail-upload-form
   [btn-add btn-upload btn-cancel]
-  (let [detail     (subscribe [:query/sample-stage-detail])
-        filename   (reaction (if-let [f (get-in @detail [:upload :file])]
-                               (.-fileName f)
-                               ""))
-        prog-n     (reaction (get-in @detail [:upload :progress]))
-        prog-state (reaction (get-in @detail [:upload :state]))
-        prog-style (reaction (cond (and (= @prog-state :success) (= @prog-n 1))
-                                   :success
-                                   (= @prog-state :error)
-                                   :danger
-                                   :else
-                                   :default))]
+  (let [detail   (subscribe [:query/sample-stage-detail])
+        filename (reaction (if-let [f (get-in @detail [:upload :file])]
+                             (.-fileName f)
+                             ""))
+        tr-state (fn [state progress]
+                   (cond (and (= state :success) (= progress 1)) :success
+                         (= state :error) :danger
+                         :else :default))
+        tx-n     (reaction (get-in @detail [:upload :transmit :progress]))
+        tx-state (reaction (get-in @detail [:upload :transmit :state]))
+        tx-style (reaction (tr-state @tx-state @tx-n))
+        cs-n     (reaction (get-in @detail [:upload :checksum :progress]))
+        cs-state (reaction (get-in @detail [:upload :checksum :state]))
+        cs-style (reaction (tr-state @cs-state @cs-n))]
     (fn []
       [:div
        [row
@@ -214,13 +216,17 @@
          [:div.progress
           {:id "stage-file-upload-progress"
            :style {:height "34px"}}
-          [progress-bar (let [attrs {:id      "stage-file-upload-progress-bar"
-                                     :striped (= :default @prog-style)
-                                     :now     (* 100 @prog-n)
-                                     :style   {:height "100%"}}]
-                          (if (= :default @prog-style)
-                            attrs
-                            (assoc attrs :bs-style (name @prog-style))))]]]]])))
+          (letfn [(mkattrs [id style progress]
+                    (let [attrs {:id       id
+                                 :striped  (= :default style)
+                                 :now      (* 100 progress)
+                                 :style    {:height "50%"}}]
+                      (if (= :default style)
+                        attrs
+                        (assoc attrs :bs-style (name style)))))]
+            [progress-bar {:style {:height "100%"}}
+             [progress-bar (mkattrs "stage-file-checksum-progress-bar" @cs-style @cs-n)]
+             [progress-bar (mkattrs "stage-file-upload-progress-bar" @tx-style @tx-n)]])]]]])))
 
 (defn component:sample-stage-input-form
   []
