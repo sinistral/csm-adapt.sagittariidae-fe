@@ -10,7 +10,7 @@
             [reagent.ratom  :refer-macros [reaction]]
 
             [sagittariidae.fe.event]
-            [sagittariidae.fe.state         :refer [get-checksum null-state]]
+            [sagittariidae.fe.state         :refer [null-state]]
             [sagittariidae.fe.reagent-utils :as u]))
 
 ;; -------------------------------------------------- adapted components --- ;;
@@ -184,18 +184,20 @@
 
 (defn component:sample-stage-detail-upload-form
   [btn-add btn-upload btn-cancel]
-  (let [detail     (subscribe [:query/sample-stage-detail])
-        filename   (reaction (if-let [f (get-in @detail [:upload :file])]
-                               (.-fileName f)
-                               ""))
-        prog-n     (reaction (get-in @detail [:upload :progress]))
-        prog-state (reaction (get-in @detail [:upload :state]))
-        prog-style (reaction (cond (and (= @prog-state :success) (= @prog-n 1))
-                                   :success
-                                   (= @prog-state :error)
-                                   :danger
-                                   :else
-                                   :default))]
+  (let [detail   (subscribe [:query/sample-stage-detail])
+        filename (reaction (if-let [f (get-in @detail [:upload :file])]
+                             (.-fileName f)
+                             ""))
+        tr-state (fn [state progress]
+                   (cond (and (= state :success) (= progress 1)) :success
+                         (= state :error) :danger
+                         :else :default))
+        tx-n     (reaction (get-in @detail [:upload :transmit :progress]))
+        tx-state (reaction (get-in @detail [:upload :transmit :state]))
+        tx-style (reaction (tr-state @tx-state @tx-n))
+        cs-n     (reaction (get-in @detail [:upload :checksum :progress]))
+        cs-state (reaction (get-in @detail [:upload :checksum :state]))
+        cs-style (reaction (tr-state @cs-state @cs-n))]
     (fn []
       [:div
        [row
@@ -215,13 +217,17 @@
          [:div.progress
           {:id "stage-file-upload-progress"
            :style {:height "34px"}}
-          [progress-bar (let [attrs {:id      "stage-file-upload-progress-bar"
-                                     :striped (= :default @prog-style)
-                                     :now     (* 100 @prog-n)
-                                     :style   {:height "100%"}}]
-                          (if (= :default @prog-style)
-                            attrs
-                            (assoc attrs :bs-style (name @prog-style))))]]]]])))
+          (letfn [(mkattrs [id style progress]
+                    (let [attrs {:id       id
+                                 :striped  (= :default style)
+                                 :now      (* 100 progress)
+                                 :style    {:height "50%"}}]
+                      (if (= :default style)
+                        attrs
+                        (assoc attrs :bs-style (name style)))))]
+            [progress-bar {:style {:height "100%"}}
+             [progress-bar (mkattrs "stage-file-checksum-progress-bar" @cs-style @cs-n)]
+             [progress-bar (mkattrs "stage-file-upload-progress-bar" @tx-style @tx-n)]])]]]])))
 
 (defn component:sample-stage-input-form
   []
@@ -331,53 +337,41 @@
 
 (defn- make-resumable-js
   []
-  (let [;; Here are defined functions that generate additional parameters to be
-        ;; included in the POST request form data when a chunk is uploaded.
-        ;; Each function must accept a single argument: a `ResumableChunk`
-        ;; object.
-        datafns [(fn [chunk]
-                   {:checksum-method :sha256
-                    :checksum-value  (get-checksum chunk)})]]
-    (js/Resumable. #js {:target "http://localhost:5000/upload-part"
+  (js/Resumable. #js {:target "http://localhost:5000/upload-part"
 
-                        ;; FIXME: Resumable v1.0.2 doesn't support these
-                        ;; options but they are available in mainline.  It
-                        ;; would be nice to put them in place when they do
-                        ;; become available, because it would clean up the API
-                        ;; and make it less Resumable-specific.
-                        ;;
-                        ;; :currentChunkSizeParameterName "part-size"
-                        ;; :chunkNumberParameterName      "part-number"
-                        ;; :totalChunksParameterName      "total-parts"
-                        ;; :totalSizeParameterName        "file-size"
-                        ;; :identifierParameterName       "upload-id"
-                        ;; :fileNameParameterName         "file-name"
-                        ;; :typeParameterName             "file-type"
+                      ;; FIXME: Resumable v1.0.2 doesn't support these
+                      ;; options but they are available in mainline.  It
+                      ;; would be nice to put them in place when they do
+                      ;; become available, because it would clean up the API
+                      ;; and make it less Resumable-specific.
+                      ;;
+                      ;; :currentChunkSizeParameterName "part-size"
+                      ;; :chunkNumberParameterName      "part-number"
+                      ;; :totalChunksParameterName      "total-parts"
+                      ;; :totalSizeParameterName        "file-size"
+                      ;; :identifierParameterName       "upload-id"
+                      ;; :fileNameParameterName         "file-name"
+                      ;; :typeParameterName             "file-type"
 
-                        :testChunks         false
-                        :maxFiles           1
-                        :maxChunkRetries    9
-                        :chunkRetryInterval 900
+                      :testChunks         false
+                      :maxFiles           1
+                      :maxChunkRetries    9
+                      :chunkRetryInterval 900
 
-                        :query (fn [_ chunk]
-                                 (clj->js
-                                  (doall
-                                   (apply merge (map #(% chunk) datafns)))))
-
-                        ;; Large uploads with many simultaneous connections
-                        ;; tend to result in 'network connection was lost'
-                        ;; errors.  Various articles point the finger at
-                        ;; Safari/MacOS (I've seen the same error in Chrome on
-                        ;; MacOS) not handling Keep-Alive connections
-                        ;; correctly.
-                        ;;
-                        ;; What I think is happening here though is that the
-                        ;; server follow a strict request-response protocol.
-                        ;; Thus the upload has to finish within the Keep-Alive
-                        ;; timeout, since the server isn't streaming Keep-Alive
-                        ;; data back to us while the upload is in progress.
-                        :simultaneousUploads 3
-                        :chunkSize           (* 512 1024)})))
+                      ;; Large uploads with many simultaneous connections
+                      ;; tend to result in 'network connection was lost'
+                      ;; errors.  Various articles point the finger at
+                      ;; Safari/MacOS (I've seen the same error in Chrome on
+                      ;; MacOS) not handling Keep-Alive connections
+                      ;; correctly.
+                      ;;
+                      ;; What I think is happening here though is that the
+                      ;; server follow a strict request-response protocol.
+                      ;; Thus the upload has to finish within the Keep-Alive
+                      ;; timeout, since the server isn't streaming Keep-Alive
+                      ;; data back to us while the upload is in progress.
+                      :simultaneousUploads 3
+                      :chunkSize           (* 512 1024)}))
 
 (defn- make-firebase-app
   []

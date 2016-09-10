@@ -39,8 +39,11 @@
                                           :status (enum :unknown :processing :ready)
                                           :uri Str}]
                              :upload {:file (maybe js/Object) ;; ResumableFile [1]
-                                      :progress Num
-                                      :state Keyword}}
+                                      :transmit {:progress Num
+                                                 :state Keyword}
+                                      :checksum {:progress Num
+                                                 :state Keyword
+                                                 :value Str}}}
               :new-stage {:method (maybe (conj method {:label Str
                                                        :value Str}))
                           :annotation Str}}
@@ -68,8 +71,11 @@
             :active-stage {:id nil
                            :file-spec []
                            :upload {:file nil
-                                    :progress 0.0
-                                    :state :default}}
+                                    :transmit {:progress 0.0
+                                               :state :default}
+                                    :checksum {:progress 0.0
+                                               :state :default
+                                               :value ""}}}
             :new-stage {:method nil
                         :annotation ""}}
    :volatile {:resumable nil
