@@ -164,22 +164,27 @@
 
 (defn component:sample-stage-detail-upload-upload-file-button
   [res]
-  (let [enabled? (subscribe [:query/ui-enabled?])
-        stages   (subscribe [:query/sample-stages])]
+  (let [ui-enabled?  (subscribe [:query/ui-enabled?])
+        stage-detail (subscribe [:query/sample-stage-detail])]
     (fn []
       [button {:title    "Upload the selected file."
                :on-click #(.upload res)
-               :disabled (or (not @enabled?) (nil? (:active @stages)))}
+               :disabled (or (not @ui-enabled?)
+                             (nil? (get @stage-detail :id))
+                             (< (get-in @stage-detail [:upload :checksum :progress]) 1)
+                             (= (get-in @stage-detail [:upload :transmit :progress]) 1))}
        [glyph-icon {:glyph "upload"}]])))
 
 (defn component:sample-stage-detail-upload-cancel-file-button
   [res]
-  (let [enabled? (subscribe [:query/ui-enabled?])
-        stages   (subscribe [:query/sample-stages])]
+  (let [ui-enabled? (subscribe [:query/ui-enabled?])
+        stage-detail (subscribe [:query/sample-stage-detail])]
     (fn []
       [button {:title    "Cancel the current file upload."
                :on-click #(.cancel res)
-               :disabled (or (not @enabled?) (nil? (:active @stages)))}
+               :disabled (or (not @ui-enabled?)
+                             (nil? (get @stage-detail :id))
+                             (= (get-in @stage-detail [:upload :transmit :progress]) 0))}
        [glyph-icon {:glyph "remove"}]])))
 
 (defn component:sample-stage-detail-upload-form
