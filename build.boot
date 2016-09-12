@@ -1,22 +1,13 @@
 
-(defn- scope-dependency
-  [scope spec]
-  (let [[p v & opt-lst] spec
-        opts (apply hash-map opt-lst)]
-    (vec (concat [p v] (reduce concat (assoc opts :scope scope))))))
-
-(defn- scope-dependencies
-  [scope specs]
-  (vec (map #(scope-dependency scope %) specs)))
-
 (defn- dependencies
   "Convert a leiningen-like dependency map into a boot dependency vector.  Map
   keys are the build stage, and values are vectors of the standard
   dependency [name version] tuple, e.g.:
   ```
-    {:build '[[org.clojure/clojure \"1.7.0\"]
-              ...]
-     :dev   '[[org.slf5j/slf4j-nop \"1.7.13\"]]}
+  (set-env! :dependencies
+            (dependencies {:build '[[org.clojure/clojure \"1.7.0\"] ...]
+                           :test  '[[midje \"1.4.0\" :exclusions [org.clojure/clojure]]]
+                           :dev   '[[org.slf5j/slf4j-nop \"1.7.13\"]]}))
   ```
   This example highlights another feature: build stage synonyms.  It can be
   (conceptually, if not practically) useful to distinguish between dependencies
@@ -25,13 +16,21 @@
   can be used together in the same definition make this distinction.  For
   convenience `:build` is a synonym for `compile`."
   [m]
-  (vec
-   (reduce concat
-           (for [[scope specs] m]
-             (scope-dependencies (cond (= :build scope) "compile"
-                                       (= :dev scope) "test"
-                                       :else (if (keyword? scope) (name scope) (str scope)))
-                                 specs)))))
+  (letfn [(scope-dependency [scope spec]
+            (let [[p v & opt-lst] spec
+                  opts (apply hash-map opt-lst)]
+              (vec (concat [p v] (reduce concat (assoc opts :scope scope))))))
+          (scope-dependencies [scope specs]
+            (vec (map #(scope-dependency scope %) specs)))]
+    (vec
+     (reduce concat
+             (for [[scope specs] m]
+               (scope-dependencies (cond (= :build scope) "compile"
+                                         (= :dev scope) "test"
+                                         :else (if (keyword? scope)
+                                                 (name scope)
+                                                 (str scope)))
+                                   specs))))))
 
 (set-env! :dependencies
           (dependencies {:build '[[org.clojure/clojure         "1.7.0"]
