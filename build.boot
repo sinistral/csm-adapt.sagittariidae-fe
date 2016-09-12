@@ -55,6 +55,7 @@
                                   [deraen/boot-less            "0.5.0"]  ;; [1]
                                   [org.slf4j/slf4j-nop         "1.7.13"]
                                   [pandeiro/boot-http          "0.7.3"]
+                                  [sinistral/mantle            "0.2.1"]
                                   ;; CIDER nREPL
                                   [org.clojure/tools.nrepl     "0.2.12"]
                                   [com.cemerick/piggieback     "0.2.1"]
@@ -72,6 +73,7 @@
  '[crisptrutski.boot-cljs-test :refer [exit! test-cljs]]
  '[degree9.boot-bower          :refer [bower]]
  '[deraen.boot-less            :refer [less]]
+ '[mantle.collection           :refer [single]]
  '[pandeiro.boot-http          :refer [serve]])
 
 (defn p
@@ -134,37 +136,52 @@
     (comp (bower :install js-deps :directory ".")
           (sift  :include #{#"^.bowerrc$" #"^bower.json$"} :invert true))))
 
-(deftask auto-test
-  []
-  (comp (testing)
-        (watch)
-        (speak)
-        (test-cljs)))
+(deftask configure-rtenv
+  [t env-tag TAG kw "A tag identifying the runtime context, typically \"prod\" or \"test\"."]
+  (let [inject (fn [tag i o]
+                 (doto o
+                   (io/make-parents)
+                   (spit (.replaceAll (slurp i) "__ENV__" (str tag)))))
+        tmpdir (tmp-dir!)]
+    (with-pre-wrap fs
+      (empty-dir! tmpdir)
+      (let [sfile (single (by-re [#"env\.cljs"] (input-files fs)))
+            ifile (tmp-file sfile)
+            fpath (tmp-path sfile)
+            ofile (io/file tmpdir fpath)]
+        (inject env-tag ifile ofile)
+        (-> fs
+            (rm [ifile])
+            (add-source tmpdir)
+            (commit!))))))
 
 (deftask test
   []
-  (comp (testing)
+  (comp (configure-rtenv)
+        (testing)
         (test-cljs)
         (exit!)))
 
 (deftask dev
   [i id ID str "The ID of the build for which REPL/auto-reload functionality is to be provided"]
   (comp (install-js-dependencies)
-        (testing   :ids           #{id})
+        (testing         :ids           #{id})
         (serve)
         (watch)
         (speak)
-        (reload    :ids           #{id}
-                   :on-jsload     (symbol (str "sagittariidae.fe." id) "main"))
-        (cljs-repl :ids           #{id})
-        (cljs      :ids           #{id}
-                   :source-map    true
-                   :optimizations :none)))
+        (reload          :ids           #{id}
+                         :on-jsload     (symbol (str "sagittariidae.fe." id) "main"))
+        (cljs-repl       :ids           #{id})
+        (configure-rtenv :env-tag       :test)
+        (cljs            :ids           #{id}
+                         :source-map    true
+                         :optimizations :none)))
 
 (deftask build
   []
   (comp (install-js-dependencies)
-        (cljs   :ids           "main"
-                :source-map    true
-                :optimizations :simple)
-        (target :directory     #{target-dir})))
+        (configure-rtenv :env-tag       :prod)
+        (cljs            :ids           #{"main"}
+                         :source-map    true
+                         :optimizations :simple)
+        (target          :directory     #{target-dir})))

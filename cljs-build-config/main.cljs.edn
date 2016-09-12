@@ -1,4 +1,5 @@
 {:require  [sagittariidae.fe.checksum
+            sagittariidae.fe.env
             sagittariidae.fe.event
             sagittariidae.fe.file
             sagittariidae.fe.reagent-utils

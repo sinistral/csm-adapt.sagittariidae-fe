@@ -3,14 +3,15 @@
   (:require [cljsjs.react-bootstrap]
             [cljsjs.react-select]
 
-            [clojure.string :as str]
-            [re-frame.core  :refer [dispatch dispatch-sync subscribe]]
-            [reagent.core   :refer [adapt-react-class render]]
+            [clojure.string :as           str]
+            [re-frame.core  :refer        [dispatch dispatch-sync subscribe]]
+            [reagent.core   :refer        [adapt-react-class render]]
             [reagent.ratom  :refer-macros [reaction]]
 
             [sagittariidae.fe.event]
+            [sagittariidae.fe.env           :as    env]
             [sagittariidae.fe.state         :refer [null-state]]
-            [sagittariidae.fe.reagent-utils :as u]))
+            [sagittariidae.fe.reagent-utils :as    u]))
 
 ;; -------------------------------------------------- adapted components --- ;;
 
@@ -321,7 +322,7 @@
 
 (defn- make-resumable-js
   []
-  (js/Resumable. #js {:target "http://localhost:5000/upload-part"
+  (js/Resumable. #js {:target (str/join [(env/get-var :upload :host "") "/upload-part"])
 
                       ;; FIXME: Resumable v1.0.2 doesn't support these
                       ;; options but they are available in mainline.  It

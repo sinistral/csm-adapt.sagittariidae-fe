@@ -1,21 +1,28 @@
 
 (ns sagittariidae.fe.event
-  (:require [clojure.string            :as    s]
-
-            [ajax.core                 :refer [GET POST PUT]]
-            [re-frame.core             :refer [dispatch register-handler]]
-            [schema.core               :refer [validate]]
-            [sagittariidae.fe.checksum :refer [array-buffer->utf8-array
-                                               utf8-array->hex-string]]
-            [sagittariidae.fe.file     :refer [process-file-chunks]]
-            [sagittariidae.fe.state    :refer [State
-                                               clear copy-state
-                                               null-state]])
+  (:require [clojure.string
+             :as s]
+            [ajax.core
+             :refer [GET POST PUT]]
+            [goog.crypt
+             :as gcrypt]
+            [re-frame.core
+             :refer [dispatch register-handler]]
+            [schema.core
+             :refer [validate]]
+            [sagittariidae.fe.checksum
+             :refer [array-buffer->utf8-array utf8-array->hex-string]]
+            [sagittariidae.fe.env
+             :as env]
+            [sagittariidae.fe.file
+             :refer [process-file-chunks]]
+            [sagittariidae.fe.state
+             :refer [State clear copy-state null-state]])
   (:import [goog.crypt Sha256]))
 
 ;; -------------------------------------------------------- server comms --- ;;
 
-(def ^{:dynamic true} ajax-endpoint "http://localhost:5000")
+(def ^{:dynamic true} ajax-endpoint (env/get-var :service :host))
 
 (defn endpoint
   [rpath]
