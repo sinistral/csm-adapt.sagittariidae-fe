@@ -46,15 +46,17 @@
                                   ;; them as build artefacts.
                                   [cljsjs/react-bootstrap      "0.29.2-0"]
                                   [cljsjs/react-select         "1.0.0-beta13-0"]]
-                         :dev   '[[adzerk/boot-cljs            "1.7.228-1"]
+                         :test  '[[crisptrutski/boot-cljs-test "0.2.2-SNAPSHOT"]]
+                         :dev   '[;; build tasks
+                                  [adzerk/boot-cljs            "1.7.228-1"]
                                   [adzerk/boot-cljs-repl       "0.3.0"]
                                   [adzerk/boot-reload          "0.4.8"]
                                   [degree9/boot-bower          "0.3.0"]
                                   [deraen/boot-less            "0.5.0"]  ;; [1]
-                                  [org.clojure/tools.nrepl     "0.2.12"]
                                   [org.slf4j/slf4j-nop         "1.7.13"]
                                   [pandeiro/boot-http          "0.7.3"]
-                                  [crisptrutski/boot-cljs-test "0.2.2-SNAPSHOT"]
+                                  ;; CIDER nREPL
+                                  [org.clojure/tools.nrepl     "0.2.12"]
                                   [com.cemerick/piggieback     "0.2.1"]
                                   [weasel                      "0.7.0"]]}))
 
