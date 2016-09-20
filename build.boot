@@ -181,6 +181,7 @@
   []
   (comp (install-js-dependencies)
         (configure-rtenv :env-tag       :prod)
+        (sift            :add-jar       {'cljsjs/react-select #"^cljsjs/react-select/common/react-select.inc.css$"})
         (cljs            :ids           #{"main"}
                          :source-map    true
                          :optimizations :simple)
