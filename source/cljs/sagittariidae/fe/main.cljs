@@ -131,7 +131,8 @@
                                           :else
                                           (:name @selected-sample)))
                         :disabled (or (not @enabled?) (empty? @search-results))}
-       (for [{:keys [id name] :as sample} @search-results]
+       (for [{:keys [id name] :as sample}
+             (sort #(apply compare (map :name [%1 %2])) @search-results)]
          (let [event [:event/sample-selected sample]]
            ^{:key id} [menu-item {:on-click #(dispatch event)} name]))])))
 
