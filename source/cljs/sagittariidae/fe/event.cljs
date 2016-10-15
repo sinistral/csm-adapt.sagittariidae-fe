@@ -154,7 +154,13 @@
               (urify (:id sample))
               "stages"]
              {:handler #(dispatch [:event/sample-stages-retrieved %])})
-   (assoc-in state [:sample :selected] sample)))
+   (-> null-state
+       (copy-state state [[:cached]
+                          [:volatile]
+                          [:project]
+                          [:search-terms]
+                          [:search-results]])
+       (assoc-in [:sample :selected] sample))))
 
 (register-handler
  :event/sample-stages-retrieved
