@@ -35,6 +35,8 @@
 (set-env! :dependencies
           (dependencies {:build '[[org.clojure/clojure         "1.7.0"]
                                   [org.clojure/clojurescript   "1.7.228"]
+                                  [org.clojure/core.async      "0.2.395"]
+
                                   [cljs-ajax                   "0.5.5"]
                                   [prismatic/schema            "1.1.2"]
                                   [re-frame                    "0.7.0"]

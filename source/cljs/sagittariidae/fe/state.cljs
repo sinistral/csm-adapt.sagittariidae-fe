@@ -43,7 +43,8 @@
               :new-stage {:method (maybe (conj method {:label Str
                                                        :value Str}))
                           :annotation Str}}
-     :volatile {:resumable js/Resumable
+     :volatile {:initchan (maybe js/Object)
+                :resumable js/Resumable
                 :digester (maybe js/Object) ; goog.crypt.Sha256 [1]
                 :checksum (maybe Str)}}))
 
@@ -73,7 +74,8 @@
                                                :value ""}}}
             :new-stage {:method nil
                         :annotation ""}}
-   :volatile {:resumable nil
+   :volatile {:initchan nil
+              :resumable nil
               :digester nil
               :checksum nil}})
 

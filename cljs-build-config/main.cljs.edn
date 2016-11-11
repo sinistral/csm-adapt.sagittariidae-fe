@@ -4,6 +4,7 @@
             sagittariidae.fe.file
             sagittariidae.fe.reagent-utils
             sagittariidae.fe.main
-            sagittariidae.fe.state]
+            sagittariidae.fe.state
+            sagittariidae.fe.util]
  :init-fns [sagittariidae.fe.main/main]
  :compiler-options {}}

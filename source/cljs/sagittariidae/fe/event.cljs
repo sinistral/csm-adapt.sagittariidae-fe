@@ -1,7 +1,10 @@
 
 (ns sagittariidae.fe.event
+  (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [clojure.string
              :as s]
+            [cljs.core.async
+             :refer [>!]]
             [ajax.core
              :refer [GET POST PUT]]
             [goog.crypt
@@ -17,7 +20,9 @@
             [sagittariidae.fe.file
              :refer [process-file-chunks]]
             [sagittariidae.fe.state
-             :refer [State clear copy-state null-state]])
+             :refer [State clear copy-state null-state]]
+            [sagittariidae.fe.util
+             :refer [->id pairs->map]])
   (:import [goog.crypt Sha256]))
 
 ;; -------------------------------------------------------- server comms --- ;;
@@ -82,12 +87,41 @@
  :event/initializing
  [validate-state]
  (fn [state [_ initial-state]]
-   (ajax-get ["projects"] {:handler #(dispatch [:event/projects-retrieved %])})
-   (ajax-get ["methods"] {:handler #(dispatch [:event/methods-retrieved %])})
+   (ajax-get ["projects"]
+             {:handler #(dispatch [:event/projects-retrieved %])})
+   (ajax-get ["methods"]
+             {:handler #(dispatch [:event/methods-retrieved %])})
    (-> (if (empty? state)
          null-state
          state)
        (conj initial-state))))
+
+(register-handler
+ :event/initialize-resource-path
+ [validate-state]
+ (fn [state [_ path]]
+   (let [{project-id :projects sample-id :samples stage-id :stages} ;
+         (pairs->map
+          (partition 2 (keep not-empty (s/split path #"/"))))
+         [project-id sample-id stage-id]
+         (map ->id [project-id sample-id stage-id])
+         project
+         (and project-id (some #(and (= (first (s/split (:id %) #"-")) project-id) %)
+                               (get-in state [:cached :projects])))]
+     (when project
+       (dispatch [:event/project-selected (select-keys project [:id :name])]))
+     (when sample-id
+       (dispatch [:event/sample-fetch-requested sample-id]))
+     (comment (when stage-id
+                (dispatch [:event/stage-selected stage-id]))))
+   state))
+
+(register-handler
+ :event/>!-initchan
+ [validate-state]
+ (fn [state [_ msg]]
+   (go (>! (get-in state [:volatile :initchan]) msg))
+   state))
 
 ;; --- static data --------------------------------------------------------- ;;
 
@@ -96,6 +130,7 @@
  [validate-state]
  (fn [state [_ methods]]
    (.info js/console "Received methods" (clj->js methods))
+   (dispatch [:event/>!-initchan :methods])
    (assoc-in state [:cached :methods] methods)))
 
 (register-handler
@@ -103,6 +138,7 @@
  [validate-state]
  (fn [state [_ projects]]
    (.info js/console "Received projects" (clj->js projects))
+   (dispatch [:event/>!-initchan :projects])
    (assoc-in state [:cached :projects] projects)))
 
 (register-handler
@@ -137,11 +173,25 @@
    state))
 
 (register-handler
+ :event/sample-fetch-requested
+ [validate-state]
+ (fn [state [_ sample-id]]
+   (ajax-get ["projects"
+              (urify (get-in state [:project :id]))
+              (str "samples")
+              (urify sample-id)]
+             {:handler #(dispatch [:event/samples-retrieved %])})
+   state))
+
+(register-handler
  :event/samples-retrieved
  [validate-state]
- (fn [state [_ samples]]
-   (.info js/console "Search returned %d samples" (count samples))
-   (assoc state :search-results (map #(select-keys % [:id :name]) samples))))
+ (fn [state [_ ret]]
+   (let [samples (map #(select-keys % [:id :name]) (if (map? ret) [ret] ret))]
+     (.info js/console "%d samples returned" (count samples))
+     (when (= (count samples) 1)
+       (dispatch [:event/sample-selected (first samples)]))
+     (assoc state :search-results samples))))
 
 (register-handler
  :event/sample-selected

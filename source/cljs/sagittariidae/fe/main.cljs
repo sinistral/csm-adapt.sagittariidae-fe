@@ -1,17 +1,20 @@
 
 (ns sagittariidae.fe.main
+  (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [cljsjs.react-bootstrap]
             [cljsjs.react-select]
 
-            [clojure.string :as           str]
-            [re-frame.core  :refer        [dispatch dispatch-sync subscribe]]
-            [reagent.core   :refer        [adapt-react-class render]]
-            [reagent.ratom  :refer-macros [reaction]]
+            [clojure.string  :as           str]
+            [cljs.core.async :refer        [chan <!]]
+            [re-frame.core   :refer        [dispatch dispatch-sync subscribe]]
+            [reagent.core    :refer        [adapt-react-class render]]
+            [reagent.ratom   :refer-macros [reaction]]
 
             [sagittariidae.fe.event]
             [sagittariidae.fe.env           :as    env]
             [sagittariidae.fe.state         :refer [null-state]]
-            [sagittariidae.fe.reagent-utils :as    u]))
+            [sagittariidae.fe.reagent-utils :as    u]
+            [sagittariidae.fe.util          :refer [pairs->map]]))
 
 ;; -------------------------------------------------- adapted components --- ;;
 
@@ -417,10 +420,41 @@
   (add-component [component:sample-stage-input-form]
                  "sample-stage-input-form"))
 
+(defn- parse-url
+  ;; https://gist.github.com/jlong/2428561
+  [url]
+  (let [p (.createElement js/document "a")]
+    (set! (.-href p) url)
+    p))
+
+(defn- unpack-query-params
+  [param-str]
+  (let [m (->> (str/split param-str #"\?")
+               (map #(str/split % "="))
+               (keep not-empty)
+               (pairs->map))]
+    (.debug js/console "Unpacked query parameters:" (clj->js m))
+    (not-empty m)))
+
 (defn main
   []
-  (let [resumable (make-resumable-js)]
+  (let [initchan  (chan)
+        resumable (make-resumable-js)]
     (dispatch-sync [:event/initializing
                     {:volatile (merge (get null-state :volatile)
-                                      {:resumable resumable})}]))
-  (initialize-components @re-frame.db/app-db))
+                                      {:initchan  initchan
+                                       :resumable resumable})}])
+    (initialize-components @re-frame.db/app-db)
+    ;;
+    (when-let [init-path
+               (:p (unpack-query-params
+                    (.-search
+                     (parse-url
+                      (-> js/window .-location .-href)))))]
+      (.debug js/console "Starting base initialization using path:" init-path)
+      (go
+        ;; FIXME: time out if nothing becomes available
+        (<! initchan) ;; projects
+        (<! initchan) ;; methods
+        (.debug js/console "Base initialization complete.")
+        (dispatch-sync [:event/initialize-resource-path init-path])))))
